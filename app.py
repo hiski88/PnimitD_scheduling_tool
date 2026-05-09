@@ -1164,96 +1164,100 @@ def render_shift_planning():
 
         st.divider()
         st.subheader("חיבור יומנים אישיים")
-        st.caption("חיבור יומנים: Google Calendar, קריאה בלבד, תומך בכמה יומנים.")
+        st.caption("Google Calendar, קריאה בלבד. ניתן לבחור כמה יומנים, להסיר יומנים לא רצויים ואז לטעון אירועים.")
 
-        calendar_mode = st.radio(
-            "מקור אירועים",
-            ["ללא חיבור", "Google Calendar"],
-            index=0,
-            help="ב-MVP האירועים מוצגים כהקשר בלבד ולא הופכים אוטומטית לחסימות.",
-        )
-
-        selected_calendar_ids: List[str] = []
-
-        if calendar_mode == "Google Calendar":
-            if not google_is_configured():
-                st.warning("Google Calendar לא מוגדר עדיין. הוסף secrets ב-Streamlit Cloud או בקובץ מקומי.")
-                st.code(
-                    """[google_oauth]
+        if not google_is_configured():
+            st.warning("Google Calendar לא מוגדר עדיין.")
+            st.markdown(
+                """
+                כדי שהחיבור יעבוד צריך:
+                1. לפתוח פרויקט ב-Google Cloud.
+                2. להפעיל Google Calendar API.
+                3. ליצור OAuth Client מסוג Web application.
+                4. להגדיר Authorized redirect URI זהה לכתובת האפליקציה ב-Streamlit Cloud.
+                5. להוסיף את הערכים ב-Secrets של Streamlit Cloud.
+                """
+            )
+            st.code(
+                """[google_oauth]
 client_id = "YOUR_CLIENT_ID"
 client_secret = "YOUR_CLIENT_SECRET"
 redirect_uri = "https://YOUR_APP.streamlit.app"
 """,
-                    language="toml",
-                )
+                language="toml",
+            )
+        else:
+            query_params = st.query_params
+            code = query_params.get("code")
+
+            if code and "google_credentials" not in st.session_state:
+                try:
+                    if finish_google_oauth(code):
+                        st.success("החיבור ליומן הושלם.")
+                except Exception as e:
+                    st.error(f"שגיאה בהשלמת החיבור: {e}")
+                    st.info("אם הבעיה חוזרת: ודא שה-Secrets מעודכנים, שה-redirect_uri זהה ב-Google Cloud וב-Streamlit, ונסה לפתוח בדפדפן פרטי.")
+
+            if "google_credentials" not in st.session_state:
+                auth_url = start_google_oauth()
+                if auth_url:
+                    st.link_button("התחבר ל-Google Calendar", auth_url)
             else:
-                query_params = st.query_params
-                code = query_params.get("code")
+                st.success("מחובר ל-Google Calendar")
+                try:
+                    calendars = list_google_calendars()
+                    options = {
+                        f"{c.get('summary', c.get('id'))} ({c.get('id')})": c["id"]
+                        for c in calendars
+                    }
 
-                if code and "google_credentials" not in st.session_state:
-                    try:
-                        if finish_google_oauth(code):
-                            st.success("החיבור ליומן הושלם.")
-                    except Exception as e:
-                        st.error(f"שגיאה בהשלמת החיבור: {e}")
+                    all_labels = list(options.keys())
+                    selected_labels = st.multiselect(
+                        "בחר יומנים לקריאה",
+                        all_labels,
+                        default=all_labels,
+                        help="כל היומנים מסומנים כברירת מחדל. ניתן להסיר יומנים לא רצויים לפני הטעינה.",
+                    )
+                    selected_calendar_ids = [options[label] for label in selected_labels]
 
-                if "google_credentials" not in st.session_state:
-                    auth_url = start_google_oauth()
-                    if auth_url:
-                        st.link_button("התחבר ל-Google Calendar", auth_url)
-                else:
-                    st.success("מחובר ל-Google Calendar")
-                    try:
-                        calendars = list_google_calendars()
-                        options = {
-                            f"{c.get('summary', c.get('id'))} ({c.get('id')})": c["id"]
-                            for c in calendars
-                        }
-                        selected_labels = st.multiselect(
-                            "בחר יומנים לקריאה",
-                            list(options.keys()),
-                            default=list(options.keys())[:1],
-                            help="אפשר לבחור כמה יומנים במקביל: אישי, משפחתי, עבודה ועוד.",
-                        )
-                        selected_calendar_ids = [options[label] for label in selected_labels]
+                    st.caption("האירועים יוצגו עם שעה ושם היומן. טעינת יומן נוסף תתווסף לאירועים שכבר נטענו.")
 
-                        st.caption("ניתן לבחור יותר מיומן אחד. האירועים יוצגו עם שעה ושם היומן.")
-                        if st.button("טען אירועים מכל היומנים שנבחרו"):
-                            if not selected_calendar_ids:
-                                st.warning("יש לבחור לפחות יומן אחד.")
-                            else:
-                                new_events = read_google_events(
-                                    selected_calendar_ids,
-                                    st.session_state["selected_year"],
-                                    st.session_state["selected_month"],
-                                )
+                    if st.button("טען אירועים מכל היומנים שנבחרו"):
+                        if not selected_calendar_ids:
+                            st.warning("יש לבחור לפחות יומן אחד.")
+                        else:
+                            new_events = read_google_events(
+                                selected_calendar_ids,
+                                st.session_state["selected_year"],
+                                st.session_state["selected_month"],
+                            )
 
-                                existing_events = merge_calendar_events(
-                                    load_calendar_event_cache(),
-                                    st.session_state.get("events_by_date", {}),
-                                )
-                                merged_events = merge_calendar_events(existing_events, new_events)
+                            existing_events = merge_calendar_events(
+                                load_calendar_event_cache(),
+                                st.session_state.get("events_by_date", {}),
+                            )
+                            merged_events = merge_calendar_events(existing_events, new_events)
 
-                                st.session_state["events_by_date"] = merged_events
-                                save_calendar_event_cache(merged_events)
-                                st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
+                            st.session_state["events_by_date"] = merged_events
+                            save_calendar_event_cache(merged_events)
+                            st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
 
-                                added_count = sum(len(v) for v in new_events.values())
-                                total_count = sum(len(v) for v in merged_events.values())
-                                st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
+                            added_count = sum(len(v) for v in new_events.values())
+                            total_count = sum(len(v) for v in merged_events.values())
+                            st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
 
-                        if st.button("נקה אירועים מהטבלה"):
-                            st.session_state["events_by_date"] = {}
-                            clear_calendar_event_cache()
-                            st.success("האירועים נוקו מהטבלה.")
+                    if st.button("נקה אירועים מהטבלה"):
+                        st.session_state["events_by_date"] = {}
+                        clear_calendar_event_cache()
+                        st.success("האירועים נוקו מהטבלה.")
 
-                        if st.button("נתק חיבור ליומן"):
-                            save_calendar_event_cache(st.session_state.get("events_by_date", {}))
-                            st.session_state.pop("google_credentials", None)
-                            st.info("החיבור נותק. האירועים שכבר נטענו נשארו בטבלה ולא יימחקו.")
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"שגיאה בקריאת יומנים: {e}")
+                    if st.button("נתק חיבור ליומן"):
+                        save_calendar_event_cache(st.session_state.get("events_by_date", {}))
+                        st.session_state.pop("google_credentials", None)
+                        st.info("החיבור נותק. האירועים שכבר נטענו נשארו בטבלה ולא יימחקו.")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"שגיאה בקריאת יומנים: {e}")
 
 
     # Month navigation
