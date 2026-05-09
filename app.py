@@ -454,6 +454,11 @@ def default_next_month() -> Tuple[int, int]:
     return add_months(today.year, today.month, 1)
 
 
+def default_previous_month() -> Tuple[int, int]:
+    today = date.today()
+    return add_months(today.year, today.month, -1)
+
+
 def month_dates(year: int, month: int) -> List[date]:
     last_day = calendar.monthrange(year, month)[1]
     return [date(year, month, day) for day in range(1, last_day + 1)]
@@ -666,6 +671,31 @@ def list_google_calendars() -> List[dict]:
     return result.get("items", [])
 
 
+
+def _format_google_event_time(event: dict) -> str:
+    start = event.get("start", {})
+    end = event.get("end", {})
+
+    if start.get("date"):
+        return "כל היום"
+
+    start_raw = start.get("dateTime")
+    end_raw = end.get("dateTime")
+    if not start_raw:
+        return ""
+
+    def parse_time(raw: str) -> str:
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            return dt.strftime("%H:%M")
+        except Exception:
+            return raw[11:16] if len(raw) >= 16 else ""
+
+    start_time = parse_time(start_raw)
+    end_time = parse_time(end_raw) if end_raw else ""
+    return f"{start_time}-{end_time}" if start_time and end_time else start_time
+
+
 def read_google_events(calendar_ids: List[str], year: int, month: int) -> Dict[str, List[str]]:
     if "google_credentials" not in st.session_state or Credentials is None or build is None:
         return {}
@@ -674,8 +704,16 @@ def read_google_events(calendar_ids: List[str], year: int, month: int) -> Dict[s
     creds = Credentials(**st.session_state["google_credentials"])
     service = build("calendar", "v3", credentials=creds)
 
+    calendar_names = {}
+    try:
+        for cal in service.calendarList().list().execute().get("items", []):
+            calendar_names[cal.get("id")] = cal.get("summary", cal.get("id", "יומן"))
+    except Exception:
+        pass
+
     events_by_date: Dict[str, List[str]] = {}
     for cal_id in calendar_ids:
+        cal_name = calendar_names.get(cal_id, cal_id)
         result = service.events().list(
             calendarId=cal_id,
             timeMin=time_min,
@@ -693,7 +731,9 @@ def read_google_events(calendar_ids: List[str], year: int, month: int) -> Dict[s
 
             iso_date = raw_start[:10]
             title = event.get("summary", "אירוע ללא כותרת")
-            events_by_date.setdefault(iso_date, []).append(title)
+            time_text = _format_google_event_time(event)
+            label = f"{time_text} [{cal_name}] {title}" if time_text else f"[{cal_name}] {title}"
+            events_by_date.setdefault(iso_date, []).append(label)
 
     return events_by_date
 
@@ -703,7 +743,7 @@ def events_to_cell(events_by_date: Dict[str, List[str]], d: date) -> str:
     if not events:
         return ""
     # Keep the table readable.
-    return " | ".join(events[:4]) + (" ..." if len(events) > 4 else "")
+    return " | ".join(events[:5]) + (" ..." if len(events) > 5 else "")
 
 
 # =========================
@@ -1123,6 +1163,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         )
                         selected_calendar_ids = [options[label] for label in selected_labels]
 
+                        st.caption("ניתן לבחור יותר מיומן אחד. האירועים יוצגו עם שעה ושם היומן.")
                         if st.button("טען אירועים מכל היומנים שנבחרו"):
                             if not selected_calendar_ids:
                                 st.warning("יש לבחור לפחות יומן אחד.")
@@ -1132,11 +1173,16 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                                     st.session_state["selected_year"],
                                     st.session_state["selected_month"],
                                 )
+                                st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
                                 st.success(f"האירועים נטענו מ-{len(selected_calendar_ids)} יומנים.")
+
+                        if st.button("נקה אירועים מהטבלה"):
+                            st.session_state["events_by_date"] = {}
+                            st.success("האירועים נוקו מהטבלה.")
 
                         if st.button("נתק חיבור ליומן"):
                             st.session_state.pop("google_credentials", None)
-                            st.session_state["events_by_date"] = {}
+                            st.info("החיבור נותק. אירועים שכבר נטענו יישארו בטבלה עד ניקוי או טעינה מחדש.")
                             st.rerun()
                     except Exception as e:
                         st.error(f"שגיאה בקריאת יומנים: {e}")
@@ -1659,7 +1705,7 @@ def render_general_table_coding():
         placeholder="יאיר\nחסימות- 1,2,3,4,7,8,9,11\nחופשים- 1,2,11\n\nדנה\nחסימות- 5,6,12\nחופשים- 20",
     )
 
-    default_y, default_m = default_next_month()
+    default_y, default_m = default_previous_month()
     col_year, col_month = st.columns(2)
     with col_year:
         selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1)
@@ -1686,7 +1732,10 @@ def render_general_table_coding():
         st.success(f"זוהו {len(parsed_df)} תורנים עבור {month_title(int(selected_year), int(selected_month))}.")
 
         st.subheader("סיכום תורנים")
-        st.dataframe(parsed_df, hide_index=True, use_container_width=True)
+        display_df = parsed_df.copy()
+        display_df["שם עובד"] = [f"עובד מס׳ {i}" for i in range(1, len(display_df) + 1)]
+        st.dataframe(display_df, hide_index=True, use_container_width=True)
+        st.caption("שמות העובדים מוסתרים בתצוגה זו. בקובץ ה-Excel עצמו השמות נשמרים לצורך נוסחאות ושיבוץ.")
 
         st.subheader("תצוגה מקדימה")
         st.caption("בתצוגה: V בתאים חסומים/חופשים, אפור בעמודות תורנים, צהוב בסופי שבוע בעמודות A:E.")
@@ -1972,7 +2021,7 @@ def render_calendar_save():
         help="הקובץ צריך לכלול את עמודות: יום בחודש, יום בשבוע, מחלקה, מיון, שישי בוקר.",
     )
 
-    default_y, default_m = default_next_month()
+    default_y, default_m = default_previous_month()
     col_year, col_month = st.columns(2)
     with col_year:
         selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1, key="ics_year")
