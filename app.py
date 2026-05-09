@@ -53,6 +53,8 @@ def inject_global_rtl_css():
         .main .block-container {
             direction: rtl !important;
             text-align: right !important;
+            padding-top: 2rem;
+            max-width: 1500px;
         }
 
         h1, h2, h3, h4, h5, h6, p, label {
@@ -65,8 +67,9 @@ def inject_global_rtl_css():
                 left: auto !important;
                 direction: rtl !important;
                 text-align: right !important;
-                border-left: 1px solid rgba(49, 51, 63, 0.2);
+                border-left: 1px solid rgba(49, 51, 63, 0.16);
                 border-right: none;
+                background: #f6f8fb;
             }
 
             section[data-testid="stSidebar"] > div,
@@ -90,7 +93,7 @@ def inject_global_rtl_css():
 
         @media (max-width: 768px) {
             .main .block-container {
-                padding: 1rem 0.75rem 4rem 0.75rem;
+                padding: 1rem 0.75rem 5rem 0.75rem;
             }
 
             div[data-testid="stDataFrame"],
@@ -100,10 +103,20 @@ def inject_global_rtl_css():
 
             button {
                 width: 100%;
+                min-height: 44px;
             }
 
             textarea, input {
                 width: 100%;
+                min-height: 42px;
+            }
+
+            .tool-hero {
+                padding: 1rem !important;
+            }
+
+            .stat-card {
+                margin-bottom: 0.4rem;
             }
         }
 
@@ -146,12 +159,87 @@ def inject_global_rtl_css():
             text-align: right !important;
             justify-content: flex-start !important;
         }
+
+        .tool-hero {
+            background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
+            border: 1px solid #e5eef9;
+            border-radius: 18px;
+            padding: 1.4rem 1.6rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 8px 22px rgba(31, 45, 61, 0.05);
+        }
+
+        .tool-hero h1 {
+            margin: 0 0 0.35rem 0;
+            font-size: 2rem;
+            font-weight: 800;
+        }
+
+        .tool-hero p {
+            margin: 0;
+            color: #5b6472;
+            font-size: 1rem;
+        }
+
+        .month-title {
+            font-size: 1.6rem;
+            font-weight: 800;
+            text-align: center !important;
+            padding-top: 0.25rem;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border: 1px solid #e9edf3;
+            border-radius: 16px;
+            padding: 1rem 1.1rem;
+            box-shadow: 0 6px 18px rgba(31, 45, 61, 0.05);
+        }
+
+        .stat-label {
+            color: #687385;
+            font-size: 0.86rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-value {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #1f2937;
+        }
+
+        .summary-box {
+            background: #fbfcfe;
+            border: 1px solid #e9edf3;
+            border-radius: 18px;
+            padding: 1.1rem 1.25rem;
+            box-shadow: 0 8px 22px rgba(31, 45, 61, 0.04);
+            margin-top: 0.75rem;
+        }
+
+        .sticky-actions {
+            position: sticky;
+            bottom: 0;
+            z-index: 999;
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(6px);
+            border-top: 1px solid #e9edf3;
+            padding: 0.85rem 0;
+            margin-top: 1rem;
+        }
+
+        .mobile-help {
+            background: #fff8e6;
+            border: 1px solid #ffe1a8;
+            border-radius: 14px;
+            padding: 0.75rem 1rem;
+            color: #664d03;
+            margin: 0.5rem 0 1rem 0;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
-
 
 # =========================
 # Date helpers
@@ -470,6 +558,163 @@ def build_copyable_submission_text(df: pd.DataFrame, employee_name: str) -> str:
     return f"{employee_name}\nחסימות- {blocked}\nחופשים- {vacations}"
 
 
+
+
+def get_selected_days(df: pd.DataFrame) -> Tuple[List[int], List[int]]:
+    blocked_days = []
+    vacation_days = []
+
+    for _, row in df.iterrows():
+        day_num = int(str(row["date"])[8:10])
+        if bool(row.get("חסום לתורנות")):
+            blocked_days.append(day_num)
+        if bool(row.get("יום חופש")):
+            vacation_days.append(day_num)
+
+    return blocked_days, vacation_days
+
+
+def render_stat_cards(blocked_days: List[int], vacation_days: List[int], notes_count: int):
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(
+            f"""
+            <div class="stat-card">
+                <div class="stat-label">חסימות לתורנות</div>
+                <div class="stat-value">{len(blocked_days)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with c2:
+        st.markdown(
+            f"""
+            <div class="stat-card">
+                <div class="stat-label">ימי חופש</div>
+                <div class="stat-value">{len(vacation_days)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(
+            f"""
+            <div class="stat-card">
+                <div class="stat-label">הערות</div>
+                <div class="stat-value">{notes_count}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def style_availability_preview(df: pd.DataFrame):
+    styles = pd.DataFrame("", index=df.index, columns=df.columns)
+
+    for idx, row in df.iterrows():
+        is_weekend_or_holiday = row.get("יום") in ["שישי", "שבת"] or bool(str(row.get("חגים / שבתות", "")).strip())
+        has_block = bool(row.get("חסום לתורנות"))
+        has_vacation = bool(row.get("יום חופש"))
+
+        for col in df.columns:
+            if is_weekend_or_holiday and col in ["תאריך", "יום", "חגים / שבתות"]:
+                styles.loc[idx, col] = "background-color: #fff3bf; font-weight: 700;"
+            elif has_vacation and col == "יום חופש":
+                styles.loc[idx, col] = "background-color: #d3f9d8;"
+            elif has_block and col == "חסום לתורנות":
+                styles.loc[idx, col] = "background-color: #ffe3e3;"
+            elif idx % 2 == 1:
+                styles.loc[idx, col] = "background-color: #fafafa;"
+
+    return df.style.apply(lambda _: styles, axis=None)
+
+
+def availability_table_to_xlsx_bytes(df: pd.DataFrame, employee_name: str, year: int, month: int) -> bytes:
+    export_cols = ["תאריך", "יום", "חגים / שבתות", "אירועים מהיומן", "חסום לתורנות", "יום חופש", "הערה"]
+    export_df = df[export_cols].copy()
+
+    buffer = BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        export_df.to_excel(writer, sheet_name="זמינות", index=False, startrow=3)
+        wb = writer.book
+        ws = wb["זמינות"]
+        ws.sheet_view.rightToLeft = True
+
+        # Title area
+        ws["A1"] = "מע׳ לתכנון תורנויות- פנימית ד׳"
+        ws["A2"] = f"שם העובד: {employee_name}"
+        ws["D2"] = f"חודש: {month_title(year, month)}"
+
+        title_fill = PatternFill("solid", fgColor="EAF4FF")
+        header_fill = PatternFill("solid", fgColor="D9EAF7")
+        weekend_fill = PatternFill("solid", fgColor="FFF3BF")
+        blocked_fill = PatternFill("solid", fgColor="FFE3E3")
+        vacation_fill = PatternFill("solid", fgColor="D3F9D8")
+        thin = Side(style="thin", color="D9DDE5")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        for cell in ws[1]:
+            cell.fill = title_fill
+        ws["A1"].font = Font(bold=True, size=15)
+        ws["A2"].font = Font(bold=True)
+        ws["D2"].font = Font(bold=True)
+
+        header_row = 4
+        for cell in ws[header_row]:
+            cell.fill = header_fill
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = border
+
+        max_row = ws.max_row
+        max_col = ws.max_column
+        for row_idx in range(header_row + 1, max_row + 1):
+            weekday = ws.cell(row=row_idx, column=2).value
+            holiday_value = ws.cell(row=row_idx, column=3).value
+            blocked_value = ws.cell(row=row_idx, column=5).value
+            vacation_value = ws.cell(row=row_idx, column=6).value
+
+            for col_idx in range(1, max_col + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = border
+
+                if row_idx % 2 == 1:
+                    cell.fill = PatternFill("solid", fgColor="FAFAFA")
+
+            if weekday in ["שישי", "שבת"] or bool(holiday_value):
+                for col_idx in [1, 2, 3]:
+                    ws.cell(row=row_idx, column=col_idx).fill = weekend_fill
+                    ws.cell(row=row_idx, column=col_idx).font = Font(bold=True)
+
+            if blocked_value is True:
+                ws.cell(row=row_idx, column=5).fill = blocked_fill
+
+            if vacation_value is True:
+                ws.cell(row=row_idx, column=6).fill = vacation_fill
+
+        widths = {
+            1: 14,
+            2: 12,
+            3: 18,
+            4: 28,
+            5: 16,
+            6: 14,
+            7: 32,
+        }
+        for col_idx, width in widths.items():
+            ws.column_dimensions[get_column_letter(col_idx)].width = width
+
+        ws.freeze_panes = "A5"
+
+    return buffer.getvalue()
+
+
+def render_mobile_cards(df: pd.DataFrame):
+    st.markdown('<div class="mobile-help">במובייל מומלץ לגלול את הטבלה לרוחב. הכרטיסים הבאים נותנים תצוגת קריאה מהירה של הימים.</div>', unsafe_allow_html=True)
+    preview_cols = ["תאריך", "יום", "חגים / שבתות", "חסום לתורנות", "יום חופש", "הערה"]
+    st.dataframe(df[preview_cols], hide_index=True, use_container_width=True)
+
 def persist_submission(payload: dict) -> None:
     with OUTPUT_FILE.open("a", encoding="utf-8") as f:
         f.write(json.dumps(payload, ensure_ascii=False) + "\n")
@@ -531,8 +776,7 @@ def render_copy_button(text_to_copy: str, button_label: str = "העתק"):
 def render_shift_planning():
     init_state()
 
-    st.header("תכנון תורנויות")
-    st.caption("הזנת זמינות, חופשות וחסימות עבור החודש המוצג.")
+    st.markdown("""<div class="tool-hero"><h1>תכנון תורנויות</h1><p>בחר ימים בהם אינך זמין לתורנויות או מעוניין בחופש. בסיום ניתן להעתיק פלט או להוריד XLSX.</p></div>""", unsafe_allow_html=True)
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
@@ -606,18 +850,18 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
     # Month navigation
     col_prev, col_title, col_next, col_reset = st.columns([1, 3, 1, 1])
     with col_prev:
-        if st.button("← חודש קודם", use_container_width=True):
+        if st.button("חודש קודם ←", use_container_width=True):
             move_month(-1)
             st.rerun()
 
     with col_title:
         st.markdown(
-            f"<h2 style='text-align:right'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</h2>",
+            f"<div class='month-title'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</div>",
             unsafe_allow_html=True,
         )
 
     with col_next:
-        if st.button("חודש הבא →", use_container_width=True):
+        if st.button("→ חודש הבא", use_container_width=True):
             move_month(1)
             st.rerun()
 
@@ -650,14 +894,19 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         },
     )
 
+    blocked_days_live, vacation_days_live = get_selected_days(edited_df)
+    notes_count_live = int(edited_df["הערה"].astype(str).str.strip().replace("nan", "").ne("").sum())
+    render_stat_cards(blocked_days_live, vacation_days_live, notes_count_live)
+
     st.divider()
 
+    st.markdown('<div class="sticky-actions">', unsafe_allow_html=True)
     col_finish, col_preview = st.columns([1, 3])
     constraints = summarize_submission(edited_df, person_id, y, m)
     submission_text = build_copyable_submission_text(edited_df, employee_name)
 
     with col_finish:
-        submitted = st.button("שמור", type="primary", use_container_width=True)
+        submitted = st.button("שמור והפק פלט", type="primary", use_container_width=True)
 
     with col_preview:
         st.subheader("סיכום בחירות")
@@ -667,7 +916,8 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             summary_df = summary_df[[col for col in visible_columns if col in summary_df.columns]]
             st.dataframe(summary_df, hide_index=True, use_container_width=True)
         else:
-            st.caption("לא נבחרו חסימות, חופשות או העדפות בחודש זה.")
+            st.caption("לא נבחרו חסימות או חופשות בחודש זה.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     if submitted:
         payload = {
@@ -679,8 +929,9 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             "constraints": constraints,
         }
         persist_submission(payload)
-        st.success(f"נשמרו {len(constraints)} אילוצים/בקשות עבור {month_title(y, m)}.")
+        st.success(f"הפלט מוכן עבור {month_title(y, m)}.")
 
+        st.markdown('<div class="summary-box">', unsafe_allow_html=True)
         st.subheader("פלט להעתקה")
         st.caption("העתק את הטקסט הבא ושלח אותו לריכוז. המבנה כולל שם, חסימות וחופשים לפי מספרי הימים בחודש.")
         st.text_area(
@@ -690,7 +941,19 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             label_visibility="collapsed",
         )
 
-        render_copy_button(submission_text, "העתק")
+        copy_col, xlsx_col = st.columns(2)
+        with copy_col:
+            render_copy_button(submission_text, "העתק")
+        with xlsx_col:
+            xlsx_bytes = availability_table_to_xlsx_bytes(edited_df, employee_name, y, m)
+            st.download_button(
+                "הורד XLSX",
+                data=xlsx_bytes,
+                file_name=f"availability_{employee_name}_{y}_{m:02d}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True,
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
