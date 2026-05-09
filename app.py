@@ -48,13 +48,14 @@ def inject_global_rtl_css():
         html, body, .stApp, [data-testid="stAppViewContainer"] {
             direction: rtl !important;
             text-align: right !important;
+            background: #fbfcfe;
         }
 
         .main .block-container {
             direction: rtl !important;
             text-align: right !important;
             padding-top: 2rem;
-            max-width: 1500px;
+            max-width: 1540px;
         }
 
         h1, h2, h3, h4, h5, h6, p, label {
@@ -67,7 +68,7 @@ def inject_global_rtl_css():
                 left: auto !important;
                 direction: rtl !important;
                 text-align: right !important;
-                border-left: 1px solid rgba(49, 51, 63, 0.16);
+                border-left: 1px solid rgba(49, 51, 63, 0.12);
                 border-right: none;
                 background: #f6f8fb;
             }
@@ -111,12 +112,26 @@ def inject_global_rtl_css():
                 min-height: 42px;
             }
 
-            .tool-hero {
+            .tool-hero, .month-nav-card, .choices-panel {
                 padding: 1rem !important;
+                border-radius: 18px !important;
             }
 
-            .stat-card {
-                margin-bottom: 0.4rem;
+            .month-nav-grid {
+                grid-template-columns: 1fr !important;
+                gap: 0.75rem !important;
+            }
+
+            .summary-stat-grid {
+                grid-template-columns: 1fr !important;
+            }
+
+            .month-center {
+                order: -1;
+            }
+
+            .action-row {
+                grid-template-columns: 1fr !important;
             }
         }
 
@@ -161,80 +176,215 @@ def inject_global_rtl_css():
         }
 
         .tool-hero {
-            background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
-            border: 1px solid #e5eef9;
-            border-radius: 18px;
+            background: radial-gradient(circle at top right, #ffffff 0%, #f8fbff 42%, #f4f8ff 100%);
+            border: 1px solid #e8eef7;
+            border-radius: 22px;
             padding: 1.4rem 1.6rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 8px 22px rgba(31, 45, 61, 0.05);
+            margin-bottom: 1.05rem;
+            box-shadow: 0 14px 32px rgba(31, 45, 61, 0.06);
         }
 
         .tool-hero h1 {
             margin: 0 0 0.35rem 0;
             font-size: 2rem;
-            font-weight: 800;
+            font-weight: 850;
+            color: #202938;
         }
 
         .tool-hero p {
             margin: 0;
-            color: #5b6472;
+            color: #647084;
             font-size: 1rem;
         }
 
-        .month-title {
-            font-size: 1.6rem;
-            font-weight: 800;
+        .month-nav-card {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid #e9edf5;
+            border-radius: 24px;
+            padding: 1.35rem 1.55rem;
+            box-shadow: 0 18px 44px rgba(31, 45, 61, 0.08);
+            margin: 0.6rem 0 1.15rem 0;
+        }
+
+        .month-nav-grid {
+            display: grid;
+            grid-template-columns: minmax(210px, 1fr) minmax(340px, 1.2fr) minmax(260px, 1fr);
+            align-items: center;
+            gap: 1.15rem;
+        }
+
+        .month-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            border-left: 1px solid #e0e6ef;
+            border-right: 1px solid #e0e6ef;
+            padding: 0.3rem 1rem;
+        }
+
+        .month-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #e8f2ff;
+            color: #2f7de1;
+            font-size: 1.55rem;
+            box-shadow: inset 0 0 0 1px rgba(47, 125, 225, 0.08);
+        }
+
+        .month-title-big {
+            font-size: 2rem;
+            font-weight: 900;
+            color: #202938;
+            line-height: 1;
             text-align: center !important;
-            padding-top: 0.25rem;
         }
 
-        .stat-card {
-            background: #ffffff;
-            border: 1px solid #e9edf3;
-            border-radius: 16px;
-            padding: 1rem 1.1rem;
-            box-shadow: 0 6px 18px rgba(31, 45, 61, 0.05);
+        .month-subtitle {
+            margin-top: 0.55rem;
+            display: inline-block;
+            background: #e8f2ff;
+            color: #2878d8;
+            border-radius: 999px;
+            padding: 0.32rem 0.9rem;
+            font-size: 0.95rem;
+            font-weight: 750;
         }
 
-        .stat-label {
-            color: #687385;
-            font-size: 0.86rem;
-            margin-bottom: 0.3rem;
+        .soft-note {
+            background: #eaf4ff;
+            border: 1px solid #d8e9ff;
+            color: #1d5fae;
+            border-radius: 14px;
+            padding: 0.75rem 1rem;
+            margin: 0.85rem 0;
+            font-weight: 600;
         }
 
-        .stat-value {
-            font-size: 1.45rem;
-            font-weight: 800;
-            color: #1f2937;
+        .summary-stat-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(170px, 1fr));
+            gap: 0.85rem;
+            margin: 0.8rem 0 1.05rem 0;
         }
 
-        .summary-box {
-            background: #fbfcfe;
-            border: 1px solid #e9edf3;
+        .summary-card {
             border-radius: 18px;
-            padding: 1.1rem 1.25rem;
-            box-shadow: 0 8px 22px rgba(31, 45, 61, 0.04);
-            margin-top: 0.75rem;
+            padding: 1rem 1.1rem;
+            border: 1px solid #e8edf5;
+            background: #fff;
+            box-shadow: 0 10px 28px rgba(31, 45, 61, 0.045);
+            min-height: 92px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .summary-card.blocked {
+            background: linear-gradient(135deg, #fff8f8 0%, #fff 100%);
+            border-color: #ffd2d2;
+        }
+
+        .summary-card.vacation {
+            background: linear-gradient(135deg, #f1fff6 0%, #fff 100%);
+            border-color: #cdeed8;
+        }
+
+        .summary-card.total {
+            background: linear-gradient(135deg, #f5faff 0%, #fff 100%);
+            border-color: #d8e9ff;
+        }
+
+        .summary-card.days {
+            background: linear-gradient(135deg, #fbfcff 0%, #fff 100%);
+        }
+
+        .summary-card-label {
+            font-size: 0.9rem;
+            color: #687385;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .summary-card-value {
+            font-size: 1.45rem;
+            color: #202938;
+            font-weight: 900;
+        }
+
+        .summary-card-sub {
+            color: #647084;
+            font-size: 0.85rem;
+        }
+
+        .summary-icon {
+            font-size: 1.7rem;
+            opacity: 0.9;
+        }
+
+        .choices-panel {
+            background: #ffffff;
+            border: 1px solid #e9edf5;
+            border-radius: 22px;
+            padding: 1.15rem 1.25rem;
+            box-shadow: 0 14px 34px rgba(31, 45, 61, 0.06);
+            margin-top: 1rem;
+        }
+
+        .choices-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .choices-panel-title {
+            font-size: 1.35rem;
+            font-weight: 900;
+            color: #202938;
+        }
+
+        .choices-panel-subtitle {
+            color: #647084;
+            font-size: 0.94rem;
+            margin-top: 0.2rem;
+        }
+
+        .action-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.85rem;
+            align-items: center;
+            margin-top: 0.85rem;
+        }
+
+        .success-strip {
+            background: linear-gradient(90deg, #eafaf0 0%, #f5fff8 100%);
+            border: 1px solid #cdeed8;
+            border-radius: 16px;
+            padding: 0.9rem 1rem;
+            color: #16803b;
+            font-weight: 750;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 0.9rem;
         }
 
         .sticky-actions {
             position: sticky;
             bottom: 0;
             z-index: 999;
-            background: rgba(255, 255, 255, 0.96);
-            backdrop-filter: blur(6px);
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(8px);
             border-top: 1px solid #e9edf3;
             padding: 0.85rem 0;
             margin-top: 1rem;
-        }
-
-        .mobile-help {
-            background: #fff8e6;
-            border: 1px solid #ffe1a8;
-            border-radius: 14px;
-            padding: 0.75rem 1rem;
-            color: #664d03;
-            margin: 0.5rem 0 1rem 0;
         }
         </style>
         """,
@@ -753,7 +903,7 @@ def render_copy_button(text_to_copy: str, button_label: str = "העתק"):
                     setTimeout(() => el.innerText = "", 1800);
                 }})'
                 style="
-                    background:#ff4b4b;
+                    background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
                     color:white;
                     border:none;
                     border-radius:8px;
@@ -770,6 +920,73 @@ def render_copy_button(text_to_copy: str, button_label: str = "העתק"):
         </div>
         """,
         height=55,
+    )
+
+
+
+def render_month_nav_card(year: int, month: int):
+    days_count = calendar.monthrange(year, month)[1]
+    st.markdown(
+        f"""
+        <div class="month-nav-card">
+            <div class="month-nav-grid">
+                <div></div>
+                <div class="month-center">
+                    <div class="month-icon">📅</div>
+                    <div>
+                        <div class="month-title-big">{month_title(year, month)}</div>
+                        <div class="month-subtitle">{days_count} ימים בחודש</div>
+                    </div>
+                </div>
+                <div></div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_summary_cards_for_choices(blocked_days: List[int], vacation_days: List[int], notes_count: int, year: int, month: int):
+    total = len(blocked_days) + len(vacation_days)
+    days_count = calendar.monthrange(year, month)[1]
+    st.markdown(
+        f"""
+        <div class="summary-stat-grid">
+            <div class="summary-card blocked">
+                <div>
+                    <div class="summary-card-label">חסומים לתורנות</div>
+                    <div class="summary-card-value">{len(blocked_days)}</div>
+                    <div class="summary-card-sub">ימים</div>
+                </div>
+                <div class="summary-icon">🚫</div>
+            </div>
+            <div class="summary-card vacation">
+                <div>
+                    <div class="summary-card-label">ימי חופש</div>
+                    <div class="summary-card-value">{len(vacation_days)}</div>
+                    <div class="summary-card-sub">ימים</div>
+                </div>
+                <div class="summary-icon">🌴</div>
+            </div>
+            <div class="summary-card total">
+                <div>
+                    <div class="summary-card-label">סה״כ בחירות</div>
+                    <div class="summary-card-value">{total}</div>
+                    <div class="summary-card-sub">שורות</div>
+                </div>
+                <div class="summary-icon">☷</div>
+            </div>
+            <div class="summary-card days">
+                <div>
+                    <div class="summary-card-label">ימי החודש</div>
+                    <div class="summary-card-value">{days_count}</div>
+                    <div class="summary-card-sub">ימים</div>
+                </div>
+                <div class="summary-icon">🗓️</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
 
@@ -848,29 +1065,25 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
 
     # Month navigation
-    col_prev, col_title, col_next, col_reset = st.columns([1, 3, 1, 1])
-    with col_prev:
+    nav_right, nav_center, nav_left = st.columns([1, 2.1, 1])
+    with nav_right:
         if st.button("חודש קודם ←", use_container_width=True):
             move_month(-1)
             st.rerun()
-
-    with col_title:
-        st.markdown(
-            f"<div class='month-title'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</div>",
-            unsafe_allow_html=True,
-        )
-
-    with col_next:
-        if st.button("→ חודש הבא", use_container_width=True):
-            move_month(1)
-            st.rerun()
-
-    with col_reset:
-        if st.button("חזור לחודש הבא", use_container_width=True):
-            y, m = default_next_month()
-            st.session_state["selected_year"] = y
-            st.session_state["selected_month"] = m
-            st.rerun()
+    with nav_center:
+        render_month_nav_card(st.session_state["selected_year"], st.session_state["selected_month"])
+    with nav_left:
+        nav_a, nav_b = st.columns(2)
+        with nav_a:
+            if st.button("→ חודש הבא", use_container_width=True):
+                move_month(1)
+                st.rerun()
+        with nav_b:
+            if st.button("📅 חזור לחודש הבא", use_container_width=True):
+                y, m = default_next_month()
+                st.session_state["selected_year"] = y
+                st.session_state["selected_month"] = m
+                st.rerun()
 
     y = st.session_state["selected_year"]
     m = st.session_state["selected_month"]
@@ -896,12 +1109,12 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
     blocked_days_live, vacation_days_live = get_selected_days(edited_df)
     notes_count_live = int(edited_df["הערה"].astype(str).str.strip().replace("nan", "").ne("").sum())
-    render_stat_cards(blocked_days_live, vacation_days_live, notes_count_live)
+    render_summary_cards_for_choices(blocked_days_live, vacation_days_live, notes_count_live, y, m)
 
     st.divider()
 
-    st.markdown('<div class="sticky-actions">', unsafe_allow_html=True)
-    col_finish, col_preview = st.columns([1, 3])
+    st.markdown('<div class="choices-panel">', unsafe_allow_html=True)
+    col_preview, col_finish = st.columns([3, 1])
     constraints = summarize_submission(edited_df, person_id, y, m)
     submission_text = build_copyable_submission_text(edited_df, employee_name)
 
@@ -909,11 +1122,21 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         submitted = st.button("שמור והפק פלט", type="primary", use_container_width=True)
 
     with col_preview:
-        st.subheader("סיכום בחירות")
+        st.markdown("""<div class="choices-panel-header"><div><div class="choices-panel-title">סיכום בחירות</div><div class="choices-panel-subtitle">רשימת כל הבחירות שבוצעו במהלך החודש</div></div></div>""", unsafe_allow_html=True)
         if constraints:
             summary_df = pd.DataFrame(constraints)
             visible_columns = ["date", "day_in_month", "type", "note"]
             summary_df = summary_df[[col for col in visible_columns if col in summary_df.columns]]
+            summary_df = summary_df.rename(columns={
+                "date": "תאריך",
+                "day_in_month": "יום בחודש",
+                "type": "סוג",
+                "note": "הערה",
+            })
+            summary_df["סוג"] = summary_df["סוג"].replace({
+                "unavailable_for_shift": "חסום לתורנות",
+                "vacation_request": "יום חופש",
+            })
             st.dataframe(summary_df, hide_index=True, use_container_width=True)
         else:
             st.caption("לא נבחרו חסימות או חופשות בחודש זה.")
@@ -929,10 +1152,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             "constraints": constraints,
         }
         persist_submission(payload)
-        st.success(f"הפלט מוכן עבור {month_title(y, m)}.")
+        st.markdown(f"""<div class="success-strip"><span>✅ הפלט מוכן עבור {month_title(y, m)}.</span><span></span></div>""", unsafe_allow_html=True)
 
-        st.markdown('<div class="summary-box">', unsafe_allow_html=True)
-        st.subheader("פלט להעתקה")
+        st.markdown('<div class="choices-panel">', unsafe_allow_html=True)
+        st.markdown("""<div class="choices-panel-title">פלט להעתקה ולהורדה</div>""", unsafe_allow_html=True)
         st.caption("העתק את הטקסט הבא ושלח אותו לריכוז. המבנה כולל שם, חסימות וחופשים לפי מספרי הימים בחודש.")
         st.text_area(
             "טקסט להעתקה",
