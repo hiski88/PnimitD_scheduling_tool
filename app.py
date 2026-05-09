@@ -900,7 +900,7 @@ def availability_table_to_xlsx_bytes(df: pd.DataFrame, employee_name: str, year:
 
         # Title area
         ws["A1"] = "מע׳ לתכנון תורנויות- פנימית ד׳"
-        ws["A2"] = f"שם העובד: {employee_name}"
+        ws["A2"] = f"שם העובד/ת: {employee_name}"
         ws["D2"] = f"חודש: {month_title(year, month)}"
 
         title_fill = PatternFill("solid", fgColor="EAF4FF")
@@ -1105,7 +1105,7 @@ def render_shift_planning():
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
-        employee_name = st.text_input("שם העובד", value="", placeholder="הקלד/י שם מלא")
+        employee_name = st.text_input("שם העובד/ת", value="", placeholder="הקלד/י שם מלא")
         person_id = employee_name
 
         st.divider()
@@ -1168,13 +1168,31 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             if not selected_calendar_ids:
                                 st.warning("יש לבחור לפחות יומן אחד.")
                             else:
-                                st.session_state["events_by_date"] = read_google_events(
+                                new_events = read_google_events(
                                     selected_calendar_ids,
                                     st.session_state["selected_year"],
                                     st.session_state["selected_month"],
                                 )
+
+                                existing_events = st.session_state.get("events_by_date", {})
+                                merged_events = {}
+
+                                all_dates = set(existing_events.keys()) | set(new_events.keys())
+
+                                for date_key in all_dates:
+                                    combined = []
+                                    combined.extend(existing_events.get(date_key, []))
+                                    combined.extend(new_events.get(date_key, []))
+
+                                    # Remove duplicates while preserving order
+                                    unique_events = list(dict.fromkeys(combined))
+                                    merged_events[date_key] = unique_events
+
+                                st.session_state["events_by_date"] = merged_events
                                 st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
-                                st.success(f"האירועים נטענו מ-{len(selected_calendar_ids)} יומנים.")
+
+                                added_count = sum(len(v) for v in new_events.values())
+                                st.success(f"נוספו {added_count} אירועים מהיומנים שנבחרו.")
 
                         if st.button("נקה אירועים מהטבלה"):
                             st.session_state["events_by_date"] = {}
@@ -1182,7 +1200,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
                         if st.button("נתק חיבור ליומן"):
                             st.session_state.pop("google_credentials", None)
-                            st.info("החיבור נותק. אירועים שכבר נטענו יישארו בטבלה עד ניקוי או טעינה מחדש.")
+                            st.info("החיבור נותק. האירועים שכבר נטענו נשארו בטבלה ולא יימחקו.")
                             st.rerun()
                     except Exception as e:
                         st.error(f"שגיאה בקריאת יומנים: {e}")
@@ -1350,7 +1368,7 @@ def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
 
         if name and not name.startswith("חסימות") and not name.startswith("חופשים"):
             records.append({
-                "שם עובד": name,
+                "שם עובד/ת": name,
                 "חסימות": ",".join(str(d) for d in extract_days(blocked_line)),
                 "חופשים": ",".join(str(d) for d in extract_days(vacation_line)),
             })
@@ -1384,9 +1402,9 @@ def build_schedule_layout_table(parsed_df: pd.DataFrame, year: int, month: int) 
         date(previous_year, previous_month, previous_last_day),
     ] + [date(year, month, day) for day in range(1, current_last_day + 1)]
 
-    employee_names = parsed_df["שם עובד"].tolist() if not parsed_df.empty else []
-    blocked_by_employee = {row["שם עובד"]: _days_from_csv(row["חסימות"]) for _, row in parsed_df.iterrows()}
-    vacation_by_employee = {row["שם עובד"]: _days_from_csv(row["חופשים"]) for _, row in parsed_df.iterrows()}
+    employee_names = parsed_df["שם עובד/ת"].tolist() if not parsed_df.empty else []
+    blocked_by_employee = {row["שם עובד/ת"]: _days_from_csv(row["חסימות"]) for _, row in parsed_df.iterrows()}
+    vacation_by_employee = {row["שם עובד/ת"]: _days_from_csv(row["חופשים"]) for _, row in parsed_df.iterrows()}
 
     rows = []
     for d in row_dates:
@@ -1449,7 +1467,7 @@ def dataframe_to_xlsx_bytes(parsed_df: pd.DataFrame, schedule_df: pd.DataFrame, 
     Bottom = editable target table used by formulas.
     """
     buffer = BytesIO()
-    employee_names = parsed_df["שם עובד"].tolist() if not parsed_df.empty else []
+    employee_names = parsed_df["שם עובד/ת"].tolist() if not parsed_df.empty else []
     n_workers = len(employee_names)
     current_last_day = calendar.monthrange(year, month)[1]
 
@@ -1685,27 +1703,15 @@ def render_general_table_coding():
     st.header("קידוד לטבלה כללית")
     st.caption("הדבק כאן את הפלטים מכל התורנים. הכלי יוצר קובץ Excel מוכן לתיאום סופי עם חסימות, סימוני V, צביעות ונוסחאות דינמיות.")
 
-    st.markdown(
-        """
-        מבנה צפוי לכל תורן:
-
-        ```text
-        יאיר
-        חסימות- 1,2,3,4,7,8,9,11
-        חופשים- 1,2,11
-        ```
-
-        יש להדביק את כל התורנים ברצף באותו שדה.
-        """
-    )
+    st.caption("הדבק כאן ברצף את הפלטים מכל העובדים/ות כפי שהתקבלו מכלי תכנון התורנויות.")
 
     raw_text = st.text_area(
         "הדבק פלטים של כל התורנים",
         height=300,
-        placeholder="יאיר\nחסימות- 1,2,3,4,7,8,9,11\nחופשים- 1,2,11\n\nדנה\nחסימות- 5,6,12\nחופשים- 20",
+        placeholder='עובד/ת מס׳ 1\nחסימות- 1,2,3\nחופשים- 5\n\nעובד/ת מס׳ 2\nחסימות- 7,8\nחופשים- 12',
     )
 
-    default_y, default_m = default_previous_month()
+    default_y, default_m = default_next_month()
     col_year, col_month = st.columns(2)
     with col_year:
         selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1)
@@ -1733,9 +1739,9 @@ def render_general_table_coding():
 
         st.subheader("סיכום תורנים")
         display_df = parsed_df.copy()
-        display_df["שם עובד"] = [f"עובד מס׳ {i}" for i in range(1, len(display_df) + 1)]
+        display_df["שם עובד/ת"] = [f"עובד/ת מס׳ {i}" for i in range(1, len(display_df) + 1)]
         st.dataframe(display_df, hide_index=True, use_container_width=True)
-        st.caption("שמות העובדים מוסתרים בתצוגה זו. בקובץ ה-Excel עצמו השמות נשמרים לצורך נוסחאות ושיבוץ.")
+        st.caption("שמות העובדים/ות מוסתרים בתצוגה זו. בקובץ ה-Excel עצמו השמות נשמרים לצורך נוסחאות ושיבוץ.")
 
         st.subheader("תצוגה מקדימה")
         st.caption("בתצוגה: V בתאים חסומים/חופשים, אפור בעמודות תורנים, צהוב בסופי שבוע בעמודות A:E.")
