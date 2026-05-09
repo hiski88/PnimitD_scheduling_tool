@@ -386,6 +386,53 @@ def inject_global_rtl_css():
             padding: 0.85rem 0;
             margin-top: 1rem;
         }
+
+        /* Strong RTL fixes for all tables and summary areas */
+        div[data-testid="stDataFrame"] {
+            direction: rtl !important;
+        }
+
+        div[data-testid="stDataFrame"] div[role="grid"],
+        div[data-testid="stDataFrame"] div[role="row"],
+        div[data-testid="stDataFrame"] div[role="columnheader"],
+        div[data-testid="stDataFrame"] div[role="gridcell"] {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        div[data-testid="stDataFrame"] div[role="columnheader"],
+        div[data-testid="stDataFrame"] div[role="gridcell"] {
+            justify-content: flex-end !important;
+        }
+
+        .summary-table-rtl {
+            direction: rtl !important;
+            text-align: right !important;
+            width: 100%;
+        }
+
+        .summary-table-rtl table {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        .summary-table-rtl th,
+        .summary-table-rtl td {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        .copy-output textarea {
+            direction: rtl !important;
+            text-align: right !important;
+            font-size: 1rem !important;
+            line-height: 1.7 !important;
+        }
+
+        .bottom-actions-row {
+            direction: rtl !important;
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -997,7 +1044,7 @@ def render_shift_planning():
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
-        employee_name = st.text_input("שם העובד", value="יאיר")
+        employee_name = st.text_input("שם העובד", value="", placeholder="הקלד/י שם מלא")
         person_id = employee_name
 
         st.divider()
@@ -1137,7 +1184,13 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                 "unavailable_for_shift": "חסום לתורנות",
                 "vacation_request": "יום חופש",
             })
+            # Streamlit's grid is visually LTR even under RTL CSS.
+            # Reversing the technical order makes "תאריך" appear as the rightmost column.
+            summary_display_order = ["הערה", "סוג", "יום בחודש", "תאריך"]
+            summary_df = summary_df[[col for col in summary_display_order if col in summary_df.columns]]
+            st.markdown('<div class="summary-table-rtl">', unsafe_allow_html=True)
             st.dataframe(summary_df, hide_index=True, use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.caption("לא נבחרו חסימות או חופשות בחודש זה.")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1157,14 +1210,17 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         st.markdown('<div class="choices-panel">', unsafe_allow_html=True)
         st.markdown("""<div class="choices-panel-title">פלט להעתקה ולהורדה</div>""", unsafe_allow_html=True)
         st.caption("העתק את הטקסט הבא ושלח אותו לריכוז. המבנה כולל שם, חסימות וחופשים לפי מספרי הימים בחודש.")
+        st.markdown('<div class="copy-output">', unsafe_allow_html=True)
         st.text_area(
             "טקסט להעתקה",
             value=submission_text,
-            height=110,
+            height=120,
             label_visibility="collapsed",
         )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        copy_col, xlsx_col = st.columns(2)
+        st.markdown('<div class="bottom-actions-row">', unsafe_allow_html=True)
+        xlsx_col, copy_col = st.columns(2)
         with copy_col:
             render_copy_button(submission_text, "העתק")
         with xlsx_col:
@@ -1176,6 +1232,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
 
