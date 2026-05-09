@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urlencode
 
+from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -1236,21 +1237,22 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+
 def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
     """
-    Expected block format:
+    Expected block per worker:
     יאיר
-    חסימות- 2,3,4
-    חופשים- 3,7
+    חסימות- 1,2,3
+    חופשים- 1,11
 
-    Blocks can be separated by empty lines or pasted one after another.
+    Multiple workers can be pasted into the same text area.
     """
     lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
     records = []
     i = 0
 
     while i < len(lines):
-        name = lines[i]
+        name = lines[i].strip()
         blocked_line = lines[i + 1] if i + 1 < len(lines) else ""
         vacation_line = lines[i + 2] if i + 2 < len(lines) else ""
 
@@ -1263,38 +1265,40 @@ def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
                 if not part:
                     continue
                 try:
-                    value = int(part)
-                    if 1 <= value <= 31:
-                        days.append(value)
+                    day = int(part)
+                    if 1 <= day <= 31:
+                        days.append(day)
                 except ValueError:
                     pass
             return sorted(set(days))
 
-        blocked_days = extract_days(blocked_line)
-        vacation_days = extract_days(vacation_line)
-
-        records.append({
-            "שם עובד": name,
-            "חסימות": ",".join(str(d) for d in blocked_days),
-            "חופשים": ",".join(str(d) for d in vacation_days),
-            "מספר חסימות": len(blocked_days),
-            "מספר חופשים": len(vacation_days),
-        })
+        if name and not name.startswith("חסימות") and not name.startswith("חופשים"):
+            records.append({
+                "שם עובד": name,
+                "חסימות": ",".join(str(d) for d in extract_days(blocked_line)),
+                "חופשים": ",".join(str(d) for d in extract_days(vacation_line)),
+            })
 
         i += 3
 
-    return pd.DataFrame(records)
+    parsed_df = pd.DataFrame(records)
+    if not parsed_df.empty:
+        parsed_df["מספר חסימות"] = parsed_df["חסימות"].apply(lambda x: len([v for v in str(x).split(",") if v]))
+        parsed_df["מספר חופשים"] = parsed_df["חופשים"].apply(lambda x: len([v for v in str(x).split(",") if v]))
+
+    return parsed_df
+
+
+def _days_from_csv(value: str) -> set:
+    out = set()
+    for part in str(value or "").split(","):
+        part = part.strip()
+        if part.isdigit():
+            out.add(int(part))
+    return out
 
 
 def build_schedule_layout_table(parsed_df: pd.DataFrame, year: int, month: int) -> pd.DataFrame:
-    """
-    Creates a manual-planning table:
-    - Two last day numbers of previous month.
-    - All day numbers of current month.
-    - Weekday column.
-    - Empty manual columns: מחלקה, מיון, שישי בוקר.
-    - Employee columns marked by blocked dates.
-    """
     previous_year, previous_month = add_months(year, month, -1)
     previous_last_day = calendar.monthrange(previous_year, previous_month)[1]
     current_last_day = calendar.monthrange(year, month)[1]
@@ -1305,13 +1309,8 @@ def build_schedule_layout_table(parsed_df: pd.DataFrame, year: int, month: int) 
     ] + [date(year, month, day) for day in range(1, current_last_day + 1)]
 
     employee_names = parsed_df["שם עובד"].tolist() if not parsed_df.empty else []
-
-    blocked_by_employee = {}
-    vacation_by_employee = {}
-    for _, row in parsed_df.iterrows():
-        name = row["שם עובד"]
-        blocked_by_employee[name] = {int(x) for x in str(row["חסימות"]).split(",") if str(x).strip().isdigit()}
-        vacation_by_employee[name] = {int(x) for x in str(row["חופשים"]).split(",") if str(x).strip().isdigit()}
+    blocked_by_employee = {row["שם עובד"]: _days_from_csv(row["חסימות"]) for _, row in parsed_df.iterrows()}
+    vacation_by_employee = {row["שם עובד"]: _days_from_csv(row["חופשים"]) for _, row in parsed_df.iterrows()}
 
     rows = []
     for d in row_dates:
@@ -1325,12 +1324,9 @@ def build_schedule_layout_table(parsed_df: pd.DataFrame, year: int, month: int) 
         }
 
         for employee in employee_names:
-            if is_current_month and d.day in blocked_by_employee.get(employee, set()):
-                out[employee] = "חסום"
-            elif is_current_month and d.day in vacation_by_employee.get(employee, set()):
-                out[employee] = "חופש"
-            else:
-                out[employee] = ""
+            blocked = is_current_month and d.day in blocked_by_employee.get(employee, set())
+            vacation = is_current_month and d.day in vacation_by_employee.get(employee, set())
+            out[employee] = "V" if (blocked or vacation) else ""
 
         rows.append(out)
 
@@ -1338,133 +1334,299 @@ def build_schedule_layout_table(parsed_df: pd.DataFrame, year: int, month: int) 
 
 
 def style_schedule_dataframe(df: pd.DataFrame):
-    """
-    Streamlit preview styling:
-    - Yellow in first two columns for Friday/Saturday.
-    - Gray in employee cells for blocked dates.
-    """
-    def style_cell(value, row_weekday=None, col_name=None):
-        if col_name in ["יום בחודש", "יום בשבוע"] and row_weekday in ["שישי", "שבת"]:
-            return "background-color: #fff200"
-        if value == "חסום":
-            return "background-color: #b7b7b7; color: #b7b7b7"
-        if value == "חופש":
-            return "background-color: #d9eaf7"
-        return ""
-
+    employee_cols = [c for c in df.columns if c not in ["יום בחודש", "יום בשבוע", "מחלקה", "מיון", "שישי בוקר"]]
     styles = pd.DataFrame("", index=df.index, columns=df.columns)
+
     for idx, row in df.iterrows():
+        is_weekend = row["יום בשבוע"] in ["שישי", "שבת"]
         for col in df.columns:
-            styles.loc[idx, col] = style_cell(row[col], row["יום בשבוע"], col)
+            if is_weekend and col in ["יום בחודש", "יום בשבוע", "מחלקה", "מיון", "שישי בוקר"]:
+                styles.loc[idx, col] = "background-color: #fff200; font-weight: bold;"
+            elif col in employee_cols and row[col] == "V":
+                styles.loc[idx, col] = "background-color: #b7b7b7; color: #000000; font-weight: bold; text-align: center;"
+            elif idx % 2 == 1:
+                styles.loc[idx, col] = "background-color: #fafafa;"
 
     return df.style.apply(lambda _: styles, axis=None)
 
 
+def _excel_addr(col_idx: int, row_idx: int, absolute: bool = True) -> str:
+    col = get_column_letter(col_idx)
+    if absolute:
+        return f"${col}${row_idx}"
+    return f"{col}{row_idx}"
+
+
+def _excel_range(c1: int, r1: int, c2: int, r2: int) -> str:
+    return f"${get_column_letter(c1)}${r1}:${get_column_letter(c2)}${r2}"
+
+
 def dataframe_to_xlsx_bytes(parsed_df: pd.DataFrame, schedule_df: pd.DataFrame, year: int, month: int) -> bytes:
+    """
+    Export a dynamic workbook similar to the uploaded duty-planning file.
+
+    Structure:
+    A:E = date/week/day/manual assignment columns.
+    F:... = employee availability columns, gray + V for blocked/vacation days.
+    After employees = dynamic calculation block:
+      שם תורן | מצוי | רצוי | סופש | רצוי סופש | חמישי/שישי | רצוי חמישי
+    Bottom = editable target table used by formulas.
+    """
     buffer = BytesIO()
+    employee_names = parsed_df["שם עובד"].tolist() if not parsed_df.empty else []
+    n_workers = len(employee_names)
+    current_last_day = calendar.monthrange(year, month)[1]
+
+    # Row model: header row 1, two previous month rows 2-3, current month rows 4..current_end_row.
+    current_start_row = 4
+    current_end_row = current_start_row + current_last_day - 1
+    data_end_row = current_end_row
+
+    first_employee_col = 6  # F
+    last_employee_col = first_employee_col + n_workers - 1 if n_workers else first_employee_col - 1
+
+    calc_start_col = first_employee_col + n_workers + 1
+    calc_name_col = calc_start_col
+    calc_found_col = calc_start_col + 1
+    calc_target_col = calc_start_col + 2
+    calc_weekend_col = calc_start_col + 3
+    calc_weekend_target_col = calc_start_col + 4
+    calc_thu_fri_col = calc_start_col + 5
+    calc_thu_fri_target_col = calc_start_col + 6
+
+    calc_header_row = 6
+    calc_first_worker_row = 7
+    calc_last_worker_row = calc_first_worker_row + n_workers - 1
+    calc_total_row = calc_last_worker_row + 1
+
+    # Bottom target table: names and manual desired counts.
+    target_names_row = data_end_row + 4
+    target_duties_row = target_names_row + 1
+    target_weekends_row = target_names_row + 2
+    target_thu_fri_row = target_names_row + 3
 
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-        schedule_df.to_excel(writer, sheet_name="טבלה כללית", index=False)
-        parsed_df.to_excel(writer, sheet_name="סיכום עובדים", index=False)
+        schedule_df.to_excel(writer, sheet_name="תורנויות", index=False)
+        parsed_df.to_excel(writer, sheet_name="סיכום קלט", index=False)
 
         wb = writer.book
-        ws = wb["טבלה כללית"]
+        ws = wb["תורנויות"]
         ws.sheet_view.rightToLeft = True
 
-        # Fills
+        # Basic fills and styles.
         header_fill = PatternFill("solid", fgColor="D9EAF7")
         weekend_fill = PatternFill("solid", fgColor="FFF200")
         blocked_fill = PatternFill("solid", fgColor="B7B7B7")
-        vacation_fill = PatternFill("solid", fgColor="D9EAF7")
+        calc_fill = PatternFill("solid", fgColor="EAF4FF")
+        target_fill = PatternFill("solid", fgColor="F3F4F6")
+        white_fill = PatternFill("solid", fgColor="FFFFFF")
         thin = Side(style="thin", color="D9D9D9")
         border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-        # Header style
+        # Header style.
         for cell in ws[1]:
             cell.fill = header_fill
             cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
             cell.border = border
 
-        # Body style
-        max_row = ws.max_row
+        # Main table body styles.
         max_col = ws.max_column
-        for row_idx in range(2, max_row + 1):
+        for row_idx in range(2, data_end_row + 1):
             weekday = ws.cell(row=row_idx, column=2).value
-
-            # Yellow only in A-B for Friday/Saturday.
-            if weekday in ["שישי", "שבת"]:
-                ws.cell(row=row_idx, column=1).fill = weekend_fill
-                ws.cell(row=row_idx, column=2).fill = weekend_fill
+            is_weekend = weekday in ["שישי", "שבת"]
 
             for col_idx in range(1, max_col + 1):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = border
+                if row_idx % 2 == 1:
+                    cell.fill = white_fill
+
+                # Yellow background for weekends in A:E inclusive.
+                if is_weekend and col_idx <= 5:
+                    cell.fill = weekend_fill
+                    cell.font = Font(bold=True)
+
+                # Gray + V in employee columns.
+                if first_employee_col <= col_idx <= last_employee_col and cell.value == "V":
+                    cell.fill = blocked_fill
+                    cell.font = Font(bold=True, color="000000")
+
+        # Data validation for manual assignment cells C:E.
+        if n_workers:
+            names_formula_range = _excel_range(first_employee_col, target_names_row, last_employee_col, target_names_row)
+            for col_idx in [3, 4, 5]:
+                # Use bottom names row as source. Some Excel versions dislike quoted sheet names in validation
+                # inside same sheet, so local absolute range is used.
+                ws.cell(row=1, column=col_idx).alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                dv = {
+                    "type": "list",
+                    "formula1": f"={names_formula_range}",
+                    "allow_blank": True,
+                }
+                # openpyxl data validation direct API is intentionally avoided here for Streamlit runtime stability.
+                # Users can type names manually; formulas are based on exact text.
+
+        # Calculation block headers.
+        calc_headers = ["שם תורן", "מצוי", "רצוי", "סופש", "רצוי סופש", "חמישי/שישי", "רצוי חמישי"]
+        for offset, header in enumerate(calc_headers):
+            cell = ws.cell(row=calc_header_row, column=calc_start_col + offset)
+            cell.value = header
+            cell.fill = calc_fill
+            cell.font = Font(bold=True)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = border
+
+        # Calculation rows and formulas.
+        assignment_range = _excel_range(3, current_start_row, 4, current_end_row)  # C:D
+        target_names_range = _excel_range(first_employee_col, target_names_row, last_employee_col, target_names_row) if n_workers else ""
+        target_duties_range = _excel_range(first_employee_col, target_duties_row, last_employee_col, target_duties_row) if n_workers else ""
+        target_weekends_range = _excel_range(first_employee_col, target_weekends_row, last_employee_col, target_weekends_row) if n_workers else ""
+        target_thu_fri_range = _excel_range(first_employee_col, target_thu_fri_row, last_employee_col, target_thu_fri_row) if n_workers else ""
+
+        weekend_terms = []
+        thu_fri_terms = []
+        for row_idx in range(current_start_row, current_end_row + 1):
+            weekday = ws.cell(row=row_idx, column=2).value
+            if weekday in ["שישי", "שבת"]:
+                weekend_terms.append(f"COUNTIF($C${row_idx}:$D${row_idx},{get_column_letter(calc_name_col)}{{row}})")
+            if weekday == "חמישי":
+                thu_fri_terms.append(f"COUNTIF($C${row_idx}:$D${row_idx},{get_column_letter(calc_name_col)}{{row}})")
+            if weekday == "שישי":
+                thu_fri_terms.append(f"COUNTIF($E${row_idx},{get_column_letter(calc_name_col)}{{row}})")
+
+        for i, worker in enumerate(employee_names):
+            row_idx = calc_first_worker_row + i
+            name_cell = ws.cell(row=row_idx, column=calc_name_col)
+            name_cell.value = worker
+            name_cell.font = Font(bold=True)
+            name_cell.alignment = Alignment(horizontal="center", vertical="center")
+            name_cell.border = border
+
+            ws.cell(row=row_idx, column=calc_found_col).value = f'=COUNTIF({assignment_range},{get_column_letter(calc_name_col)}{row_idx})'
+            ws.cell(row=row_idx, column=calc_target_col).value = f'=IFERROR(INDEX({target_duties_range},1,MATCH({get_column_letter(calc_name_col)}{row_idx},{target_names_range},0)),"")'
+            ws.cell(row=row_idx, column=calc_weekend_col).value = "=" + ("+".join(term.format(row=row_idx) for term in weekend_terms) if weekend_terms else "0")
+            ws.cell(row=row_idx, column=calc_weekend_target_col).value = f'=IFERROR(INDEX({target_weekends_range},1,MATCH({get_column_letter(calc_name_col)}{row_idx},{target_names_range},0)),"")'
+            ws.cell(row=row_idx, column=calc_thu_fri_col).value = "=" + ("+".join(term.format(row=row_idx) for term in thu_fri_terms) if thu_fri_terms else "0")
+            ws.cell(row=row_idx, column=calc_thu_fri_target_col).value = f'=IFERROR(INDEX({target_thu_fri_range},1,MATCH({get_column_letter(calc_name_col)}{row_idx},{target_names_range},0)),"")'
+
+            for col_idx in range(calc_start_col, calc_thu_fri_target_col + 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.border = border
 
-                if col_idx >= 6 and cell.value == "חסום":
-                    cell.fill = blocked_fill
-                    cell.font = Font(color="B7B7B7")
-                elif col_idx >= 6 and cell.value == "חופש":
-                    cell.fill = vacation_fill
+        # Totals row.
+        if n_workers:
+            ws.cell(row=calc_total_row, column=calc_name_col).value = "סהכ"
+            ws.cell(row=calc_total_row, column=calc_name_col).font = Font(bold=True)
+            for col_idx in range(calc_found_col, calc_thu_fri_target_col + 1):
+                col_letter = get_column_letter(col_idx)
+                ws.cell(row=calc_total_row, column=col_idx).value = f"=SUM({col_letter}{calc_first_worker_row}:{col_letter}{calc_last_worker_row})"
+                ws.cell(row=calc_total_row, column=col_idx).font = Font(bold=True)
 
+            for col_idx in range(calc_start_col, calc_thu_fri_target_col + 1):
+                cell = ws.cell(row=calc_total_row, column=col_idx)
+                cell.fill = calc_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.border = border
+
+        # Bottom target table.
+        if n_workers:
+            for i, worker in enumerate(employee_names):
+                col_idx = first_employee_col + i
+                ws.cell(row=target_names_row, column=col_idx).value = worker
+                ws.cell(row=target_names_row, column=col_idx).font = Font(bold=True)
+                ws.cell(row=target_names_row, column=col_idx).fill = target_fill
+                ws.cell(row=target_names_row, column=col_idx).alignment = Alignment(horizontal="center", vertical="center")
+                ws.cell(row=target_names_row, column=col_idx).border = border
+
+                # Leave these values editable by default. Put 0 as a clear placeholder.
+                for target_row in [target_duties_row, target_weekends_row, target_thu_fri_row]:
+                    ws.cell(row=target_row, column=col_idx).value = 0
+                    ws.cell(row=target_row, column=col_idx).alignment = Alignment(horizontal="center", vertical="center")
+                    ws.cell(row=target_row, column=col_idx).border = border
+
+            labels = {
+                target_duties_row: "תורנויות",
+                target_weekends_row: "סופשים",
+                target_thu_fri_row: "חמישי/שישי",
+            }
+            for row_idx, label in labels.items():
+                ws.cell(row=row_idx, column=5).value = label
+                ws.cell(row=row_idx, column=5).font = Font(bold=True)
+                ws.cell(row=row_idx, column=5).fill = target_fill
+                ws.cell(row=row_idx, column=5).alignment = Alignment(horizontal="center", vertical="center")
+                ws.cell(row=row_idx, column=5).border = border
+
+        # Notes.
+        ws.cell(row=target_thu_fri_row + 4, column=2).value = "ב+ה חותמים"
+        ws.cell(row=target_thu_fri_row + 5, column=2).value = "ג+ד+ו לא חותמים"
+
+        # Freeze panes and widths.
         ws.freeze_panes = "F2"
 
         widths = {
-            1: 10,  # יום בחודש
-            2: 13,  # יום בשבוע
-            3: 14,  # מחלקה
-            4: 14,  # מיון
-            5: 14,  # שישי בוקר
+            1: 10,
+            2: 16,
+            3: 15,
+            4: 15,
+            5: 15,
         }
 
-        for col_idx in range(1, max_col + 1):
-            letter = get_column_letter(col_idx)
-            ws.column_dimensions[letter].width = widths.get(col_idx, 12)
+        # Employees.
+        for col_idx in range(first_employee_col, last_employee_col + 1):
+            widths[col_idx] = 12
 
-        # Summary sheet formatting
-        summary_ws = wb["סיכום עובדים"]
+        # Calculations.
+        for col_idx in range(calc_start_col, calc_thu_fri_target_col + 1):
+            widths[col_idx] = 14
+
+        for col_idx in range(1, calc_thu_fri_target_col + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = widths.get(col_idx, 12)
+
+        # Summary input sheet formatting.
+        summary_ws = wb["סיכום קלט"]
         summary_ws.sheet_view.rightToLeft = True
         summary_ws.freeze_panes = "A2"
-
         for cell in summary_ws[1]:
             cell.fill = header_fill
             cell.font = Font(bold=True)
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = border
-
         for row in summary_ws.iter_rows(min_row=2):
             for cell in row:
                 cell.alignment = Alignment(horizontal="center", vertical="center")
                 cell.border = border
-
         for col in summary_ws.columns:
             max_len = max(len(str(cell.value or "")) for cell in col)
-            summary_ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 10), 28)
+            summary_ws.column_dimensions[col[0].column_letter].width = min(max(max_len + 2, 10), 32)
 
     return buffer.getvalue()
 
 
 def render_general_table_coding():
     st.header("קידוד לטבלה כללית")
-    st.caption("הדבק כאן פלטים מכל העובדים. הכלי יוצר טבלת חודש בסגנון Excel ידני: ימים, יום בשבוע, עמודות מילוי ידני, ואז עובדים.")
+    st.caption("הדבק כאן את הפלטים מכל התורנים. הכלי יוצר קובץ Excel מוכן לתיאום סופי עם חסימות, סימוני V, צביעות ונוסחאות דינמיות.")
 
     st.markdown(
         """
-        מבנה צפוי לכל עובד:
+        מבנה צפוי לכל תורן:
 
         ```text
         יאיר
-        חסימות- 2,3,4,5,6,7,12,13,14,15,24
-        חופשים- 3,7,15
+        חסימות- 1,2,3,4,7,8,9,11
+        חופשים- 1,2,11
         ```
+
+        יש להדביק את כל התורנים ברצף באותו שדה.
         """
     )
 
     raw_text = st.text_area(
-        "הדבק פלטים של עובדים",
-        height=260,
-        placeholder="יאיר\nחסימות- 2,3,4,5,6,7,12,13,14,15,24\nחופשים- 3,7,15\n\nדנה\nחסימות- 1,8,9\nחופשים- 14",
+        "הדבק פלטים של כל התורנים",
+        height=300,
+        placeholder="יאיר\nחסימות- 1,2,3,4,7,8,9,11\nחופשים- 1,2,11\n\nדנה\nחסימות- 5,6,12\nחופשים- 20",
     )
 
     default_y, default_m = default_next_month()
@@ -1475,57 +1637,362 @@ def render_general_table_coding():
         selected_month = st.number_input("חודש", min_value=1, max_value=12, value=default_m, step=1)
 
     st.info(
-        "הטבלה תכלול את שני מספרי הימים האחרונים של החודש הקודם, ואז את כל ימי החודש הנבחר. "
-        "עמודות מחלקה, מיון ושישי בוקר נשארות ריקות למילוי ידני."
+        "הקובץ יכלול את שני הימים האחרונים של החודש הקודם, את כל ימי החודש הנבחר, "
+        "עמודות מחלקה/מיון/שישי בוקר למילוי ידני, עמודות תורנים, ונוסחאות חישוב אוטומטיות אחרי עמודות התורנים."
     )
 
-    save_mode = st.radio(
-        "בחר דרך עבודה",
-        ["יצירת קובץ Excel לאחר הדבקה", "שמירה בגוגל ספרדשיט משותף - בהמשך"],
-        index=0,
-    )
-
-    if save_mode == "שמירה בגוגל ספרדשיט משותף - בהמשך":
-        st.info("אפשרות זו תדרוש חיבור Google Sheets API והרשאות כתיבה. בשלב הנוכחי מומלץ להשתמש ביצירת Excel.")
-
-    if st.button("קודד לטבלה כללית", type="primary"):
+    if st.button("צור טבלת תורנויות", type="primary"):
         if not raw_text.strip():
             st.warning("יש להדביק לפחות פלט אחד.")
             return
 
         parsed_df = parse_worker_blocks(raw_text)
+        if parsed_df.empty:
+            st.error("לא זוהו תורנים. בדוק שהמבנה הוא: שם, חסימות, חופשים.")
+            return
+
         schedule_df = build_schedule_layout_table(parsed_df, int(selected_year), int(selected_month))
 
-        st.success(f"קודדו {len(parsed_df)} עובדים עבור {month_title(int(selected_year), int(selected_month))}.")
+        st.success(f"זוהו {len(parsed_df)} תורנים עבור {month_title(int(selected_year), int(selected_month))}.")
 
-        st.subheader("סיכום עובדים")
+        st.subheader("סיכום תורנים")
         st.dataframe(parsed_df, hide_index=True, use_container_width=True)
 
-        st.subheader("טבלה כללית")
-        st.caption("בתצוגה: שישי/שבת צהוב בעמודות הראשונות; חסימות מסומנות באפור בעמודות העובדים.")
+        st.subheader("תצוגה מקדימה")
+        st.caption("בתצוגה: V בתאים חסומים/חופשים, אפור בעמודות תורנים, צהוב בסופי שבוע בעמודות A:E.")
         st.dataframe(style_schedule_dataframe(schedule_df), hide_index=True, use_container_width=True)
 
         xlsx_bytes = dataframe_to_xlsx_bytes(parsed_df, schedule_df, int(selected_year), int(selected_month))
         st.download_button(
-            "הורד Excel",
+            "הורד קובץ Excel לתיאום תורנויות",
             data=xlsx_bytes,
-            file_name=f"availability_general_table_{int(selected_year)}_{int(selected_month):02d}.xlsx",
+            file_name=f"tornuyot_{int(selected_year)}_{int(selected_month):02d}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True,
         )
+
+
+
+def _clean_worker_name(value: object) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    text = text.replace("*", "").strip()
+    text = re.sub(r"\s+", " ", text)
+    # Values in the assignment sheet can be like "ב-נורית" or "ה-גל".
+    # The calendar event belongs to the worker after the hyphen.
+    if "-" in text:
+        text = text.split("-")[-1].strip()
+    if "–" in text:
+        text = text.split("–")[-1].strip()
+    return text
+
+
+def _raw_text(value: object) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _find_schedule_sheet(wb):
+    if "תורנויות" in wb.sheetnames:
+        return wb["תורנויות"]
+    return wb[wb.sheetnames[0]]
+
+
+def _detect_workers_from_sheet(ws) -> List[str]:
+    workers = []
+    # In the generated/final file, worker availability columns start at F.
+    # Stop at first empty cell or when calculation headers begin.
+    for col in range(6, ws.max_column + 1):
+        value = ws.cell(row=1, column=col).value
+        name = _clean_worker_name(value)
+        if not name:
+            break
+        if name in {"מצוי", "רצוי", "סופש", "רצוי סופש", "חמישי/שישי", "שישי/חמישי", "רצוי חמישי", "שם תורן"}:
+            break
+        workers.append(name)
+
+    # Fallback: detect from assignment columns C:E.
+    if not workers:
+        found = set()
+        for row in range(2, ws.max_row + 1):
+            day_value = ws.cell(row=row, column=1).value
+            if not isinstance(day_value, int):
+                continue
+            for col in [3, 4, 5]:
+                name = _clean_worker_name(ws.cell(row=row, column=col).value)
+                if name:
+                    found.add(name)
+        workers = sorted(found)
+
+    # Preserve order, remove duplicates.
+    ordered = []
+    seen = set()
+    for worker in workers:
+        if worker and worker not in seen:
+            ordered.append(worker)
+            seen.add(worker)
+    return ordered
+
+
+def _extract_month_rows(ws, year: int, month: int) -> List[dict]:
+    last_day = calendar.monthrange(year, month)[1]
+    first_month_row = None
+
+    for row in range(2, ws.max_row + 1):
+        day_value = ws.cell(row=row, column=1).value
+        weekday_value = ws.cell(row=row, column=2).value
+        if day_value == 1 and weekday_value:
+            first_month_row = row
+            break
+
+    if first_month_row is None:
+        return []
+
+    rows = []
+    for row in range(first_month_row, min(ws.max_row, first_month_row + last_day + 5) + 1):
+        day_value = ws.cell(row=row, column=1).value
+        weekday_value = ws.cell(row=row, column=2).value
+        if not isinstance(day_value, int):
+            continue
+        if not (1 <= day_value <= last_day):
+            continue
+
+        rows.append({
+            "excel_row": row,
+            "date": date(year, month, day_value),
+            "day_in_month": day_value,
+            "weekday": str(weekday_value or ""),
+            "מחלקה": _raw_text(ws.cell(row=row, column=3).value),
+            "מיון": _raw_text(ws.cell(row=row, column=4).value),
+            "שישי בוקר": _raw_text(ws.cell(row=row, column=5).value),
+        })
+
+        if day_value == last_day:
+            break
+
+    return rows
+
+
+def parse_final_schedule_excel(uploaded_file, year: int, month: int) -> Tuple[List[str], List[dict]]:
+    wb = load_workbook(uploaded_file, data_only=True)
+    ws = _find_schedule_sheet(wb)
+    workers = _detect_workers_from_sheet(ws)
+    rows = _extract_month_rows(ws, year, month)
+    return workers, rows
+
+
+def extract_worker_events(schedule_rows: List[dict], worker_name: str, times_config: dict) -> List[dict]:
+    events = []
+
+    shift_definitions = [
+        {
+            "column": "מחלקה",
+            "title": "תורנות מחלקה - פנימית ד׳",
+            "start_time": times_config["department_start"],
+            "end_time": times_config["department_end"],
+            "ends_next_day": True,
+        },
+        {
+            "column": "מיון",
+            "title": "תורנות מיון - פנימית ד׳",
+            "start_time": times_config["er_start"],
+            "end_time": times_config["er_end"],
+            "ends_next_day": True,
+        },
+        {
+            "column": "שישי בוקר",
+            "title": "שישי בוקר - פנימית ד׳",
+            "start_time": times_config["friday_morning_start"],
+            "end_time": times_config["friday_morning_end"],
+            "ends_next_day": False,
+        },
+    ]
+
+    selected = _clean_worker_name(worker_name)
+
+    for row in schedule_rows:
+        for shift in shift_definitions:
+            raw_value = row.get(shift["column"], "")
+            assigned_worker = _clean_worker_name(raw_value)
+            if not assigned_worker or assigned_worker != selected:
+                continue
+
+            start_dt = datetime.combine(row["date"], shift["start_time"])
+            end_date = row["date"] + timedelta(days=1) if shift["ends_next_day"] else row["date"]
+            end_dt = datetime.combine(end_date, shift["end_time"])
+
+            events.append({
+                "date": row["date"],
+                "weekday": row["weekday"],
+                "shift_type": shift["column"],
+                "title": shift["title"],
+                "start_dt": start_dt,
+                "end_dt": end_dt,
+                "raw_assignment": raw_value,
+            })
+
+    events.sort(key=lambda item: item["start_dt"])
+    return events
+
+
+def _ics_escape(text: str) -> str:
+    text = str(text or "")
+    text = text.replace("\\", "\\\\")
+    text = text.replace(";", "\\;")
+    text = text.replace(",", "\\,")
+    text = text.replace("\n", "\\n")
+    return text
+
+
+def _ics_dt(dt: datetime) -> str:
+    return dt.strftime("%Y%m%dT%H%M%S")
+
+
+def build_ics(events: List[dict], worker_name: str, calendar_name: str = "תורנויות פנימית ד׳") -> str:
+    now = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//MedStaff//PnimitD Scheduling Tool//HE",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        f"X-WR-CALNAME:{_ics_escape(calendar_name)}",
+        "X-WR-TIMEZONE:Asia/Jerusalem",
+    ]
+
+    safe_worker = _clean_worker_name(worker_name)
+
+    for idx, event in enumerate(events, start=1):
+        uid = f"pnimit-d-{safe_worker}-{event['start_dt'].strftime('%Y%m%d%H%M')}-{idx}@medstaff.local"
+        description = (
+            f"תורן/ית: {safe_worker}\\n"
+            f"סוג תורנות: {event['shift_type']}\\n"
+            f"יום: {event['weekday']}\\n"
+            f"שיבוץ מקורי בקובץ: {event['raw_assignment']}"
+        )
+
+        lines.extend([
+            "BEGIN:VEVENT",
+            f"UID:{_ics_escape(uid)}",
+            f"DTSTAMP:{now}",
+            f"DTSTART;TZID=Asia/Jerusalem:{_ics_dt(event['start_dt'])}",
+            f"DTEND;TZID=Asia/Jerusalem:{_ics_dt(event['end_dt'])}",
+            f"SUMMARY:{_ics_escape(event['title'])}",
+            f"DESCRIPTION:{_ics_escape(description)}",
+            "LOCATION:פנימית ד׳",
+            "BEGIN:VALARM",
+            "TRIGGER:-PT12H",
+            "ACTION:DISPLAY",
+            f"DESCRIPTION:{_ics_escape(event['title'])}",
+            "END:VALARM",
+            "END:VEVENT",
+        ])
+
+    lines.append("END:VCALENDAR")
+    return "\r\n".join(lines) + "\r\n"
 
 
 def render_calendar_save():
     st.header("שמירה ביומן")
-    st.info("כלי זה טרם נבנה. בהמשך ניתן יהיה לשמור תורנויות מאושרות ליומן אישי או מחלקתי.")
-    st.markdown(
-        """
-        כיוון אפשרי לכלי:
-        - בחירת סידור תורנויות סופי.
-        - בחירת יומן יעד.
-        - יצירת אירועי יומן.
-        - שמירה לאחר אישור משתמש.
-        """
+    st.caption("העלה את קובץ ה-Excel הסופי לאחר חלוקת התורנויות, בחר תורן, והורד קובץ ICS לייבוא ליומן.")
+
+    st.info(
+        "קובץ ICS הוא פורמט יומן אחיד שנתמך ב-Google Calendar, Outlook ו-Apple Calendar. "
+        "אין צורך בחיבור ישיר ליומן או בהרשאות OAuth."
     )
+
+    uploaded_file = st.file_uploader(
+        "העלה קובץ תורנויות סופי",
+        type=["xlsx"],
+        help="הקובץ צריך לכלול את עמודות: יום בחודש, יום בשבוע, מחלקה, מיון, שישי בוקר.",
+    )
+
+    default_y, default_m = default_next_month()
+    col_year, col_month = st.columns(2)
+    with col_year:
+        selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1, key="ics_year")
+    with col_month:
+        selected_month = st.number_input("חודש", min_value=1, max_value=12, value=default_m, step=1, key="ics_month")
+
+    st.subheader("שעות תורנות")
+    time_col1, time_col2, time_col3 = st.columns(3)
+    with time_col1:
+        department_start = st.time_input("מחלקה - התחלה", value=time(8, 0))
+        department_end = st.time_input("מחלקה - סיום למחרת", value=time(10, 0))
+    with time_col2:
+        er_start = st.time_input("מיון - התחלה", value=time(16, 0))
+        er_end = st.time_input("מיון - סיום למחרת", value=time(8, 0))
+    with time_col3:
+        friday_morning_start = st.time_input("שישי בוקר - התחלה", value=time(8, 0))
+        friday_morning_end = st.time_input("שישי בוקר - סיום", value=time(14, 0))
+
+    if not uploaded_file:
+        st.caption("לאחר העלאת קובץ, תופיע בחירת תורן ורשימת התורנויות שלו.")
+        return
+
+    try:
+        workers, schedule_rows = parse_final_schedule_excel(uploaded_file, int(selected_year), int(selected_month))
+    except Exception as e:
+        st.error(f"שגיאה בקריאת הקובץ: {e}")
+        return
+
+    if not schedule_rows:
+        st.error("לא נמצאו שורות חודש תקינות בקובץ. ודא שהעמודה הראשונה כוללת את ימי החודש ושיש שורה עבור יום 1.")
+        return
+
+    if not workers:
+        st.warning("לא זוהו שמות תורנים מהקובץ. ניתן עדיין להקליד שם ידנית.")
+        worker_name = st.text_input("שם תורן", value="")
+    else:
+        worker_name = st.selectbox("בחר תורן", workers)
+
+    if not worker_name:
+        return
+
+    times_config = {
+        "department_start": department_start,
+        "department_end": department_end,
+        "er_start": er_start,
+        "er_end": er_end,
+        "friday_morning_start": friday_morning_start,
+        "friday_morning_end": friday_morning_end,
+    }
+
+    events = extract_worker_events(schedule_rows, worker_name, times_config)
+
+    st.subheader("תורנויות שיזוהו ליומן")
+    if not events:
+        st.warning("לא נמצאו תורנויות עבור התורן שנבחר.")
+        return
+
+    preview_df = pd.DataFrame([
+        {
+            "תאריך": event["date"].strftime("%d/%m/%Y"),
+            "יום": event["weekday"],
+            "סוג": event["shift_type"],
+            "התחלה": event["start_dt"].strftime("%d/%m/%Y %H:%M"),
+            "סיום": event["end_dt"].strftime("%d/%m/%Y %H:%M"),
+            "שיבוץ בקובץ": event["raw_assignment"],
+        }
+        for event in events
+    ])
+
+    # Reverse technical order to keep visual RTL.
+    preview_order = ["שיבוץ בקובץ", "סיום", "התחלה", "סוג", "יום", "תאריך"]
+    st.dataframe(preview_df[preview_order], hide_index=True, use_container_width=True)
+
+    ics_content = build_ics(events, worker_name)
+    safe_name = re.sub(r"[^A-Za-z0-9א-ת_-]+", "_", _clean_worker_name(worker_name)).strip("_") or "worker"
+
+    st.download_button(
+        "הורד קובץ יומן ICS",
+        data=ics_content.encode("utf-8"),
+        file_name=f"tornuyot_{safe_name}_{int(selected_year)}_{int(selected_month):02d}.ics",
+        mime="text/calendar",
+        use_container_width=True,
+    )
+
+    st.caption("לאחר ההורדה, פתח את הקובץ או ייבא אותו ליומן הרצוי. Google, Outlook ו-Apple Calendar תומכים ב-ICS.")
 
 
 def render_sidebar_navigation() -> str:
