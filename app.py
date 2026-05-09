@@ -591,17 +591,32 @@ def google_is_configured() -> bool:
     return Flow is not None and build is not None and parse_google_secret_client_config() is not None
 
 
-def start_google_oauth() -> Optional[str]:
+
+def _new_google_flow() -> Optional[Flow]:
     client_config = parse_google_secret_client_config()
     if not client_config or Flow is None:
         return None
 
     redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-    flow = Flow.from_client_config(
+
+    # Streamlit Cloud may return from Google in a refreshed session.
+    # Use a confidential Web OAuth client with client_secret, without PKCE/code_verifier.
+    return Flow.from_client_config(
         client_config,
         scopes=SCOPES,
         redirect_uri=redirect_uri,
+        autogenerate_code_verifier=False,
     )
+
+
+def start_google_oauth() -> Optional[str]:
+    if Flow is None:
+        return None
+
+    flow = _new_google_flow()
+    if flow is None:
+        return None
+
     auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
@@ -612,19 +627,16 @@ def start_google_oauth() -> Optional[str]:
 
 
 def finish_google_oauth(code: str) -> bool:
-    client_config = parse_google_secret_client_config()
-    if not client_config or Flow is None:
+    if Flow is None:
         return False
 
-    redirect_uri = st.secrets["google_oauth"]["redirect_uri"]
-    flow = Flow.from_client_config(
-        client_config,
-        scopes=SCOPES,
-        redirect_uri=redirect_uri,
-        state=st.session_state.get("google_oauth_state"),
-    )
+    flow = _new_google_flow()
+    if flow is None:
+        return False
+
     flow.fetch_token(code=code)
     creds = flow.credentials
+
     st.session_state["google_credentials"] = {
         "token": creds.token,
         "refresh_token": creds.refresh_token,
@@ -633,6 +645,14 @@ def finish_google_oauth(code: str) -> bool:
         "client_secret": creds.client_secret,
         "scopes": creds.scopes,
     }
+
+    st.session_state.pop("google_oauth_state", None)
+
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
+
     return True
 
 
@@ -1050,6 +1070,7 @@ def render_shift_planning():
 
         st.divider()
         st.subheader("חיבור יומנים אישיים")
+        st.caption("חיבור יומנים: Google Calendar, קריאה בלבד, תומך בכמה יומנים.")
 
         calendar_mode = st.radio(
             "מקור אירועים",
@@ -1098,16 +1119,25 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             "בחר יומנים לקריאה",
                             list(options.keys()),
                             default=list(options.keys())[:1],
+                            help="אפשר לבחור כמה יומנים במקביל: אישי, משפחתי, עבודה ועוד.",
                         )
                         selected_calendar_ids = [options[label] for label in selected_labels]
 
-                        if st.button("טען אירועים לחודש המוצג"):
-                            st.session_state["events_by_date"] = read_google_events(
-                                selected_calendar_ids,
-                                st.session_state["selected_year"],
-                                st.session_state["selected_month"],
-                            )
-                            st.success("האירועים נטענו.")
+                        if st.button("טען אירועים מכל היומנים שנבחרו"):
+                            if not selected_calendar_ids:
+                                st.warning("יש לבחור לפחות יומן אחד.")
+                            else:
+                                st.session_state["events_by_date"] = read_google_events(
+                                    selected_calendar_ids,
+                                    st.session_state["selected_year"],
+                                    st.session_state["selected_month"],
+                                )
+                                st.success(f"האירועים נטענו מ-{len(selected_calendar_ids)} יומנים.")
+
+                        if st.button("נתק חיבור ליומן"):
+                            st.session_state.pop("google_credentials", None)
+                            st.session_state["events_by_date"] = {}
+                            st.rerun()
                     except Exception as e:
                         st.error(f"שגיאה בקריאת יומנים: {e}")
 
@@ -1781,6 +1811,7 @@ def parse_final_schedule_excel(uploaded_file, year: int, month: int) -> Tuple[Li
     return workers, rows
 
 
+
 def extract_worker_events(schedule_rows: List[dict], worker_name: str, times_config: dict) -> List[dict]:
     events = []
 
@@ -1809,6 +1840,7 @@ def extract_worker_events(schedule_rows: List[dict], worker_name: str, times_con
     ]
 
     selected = _clean_worker_name(worker_name)
+    auto_friday_keys = set()
 
     for row in schedule_rows:
         for shift in shift_definitions:
@@ -1829,10 +1861,42 @@ def extract_worker_events(schedule_rows: List[dict], worker_name: str, times_con
                 "start_dt": start_dt,
                 "end_dt": end_dt,
                 "raw_assignment": raw_value,
+                "source": "שיבוץ ישיר",
             })
 
-    events.sort(key=lambda item: item["start_dt"])
-    return events
+            # Business rule:
+            # Department Saturday duty also means the Saturday duty resident works
+            # Friday morning in the department, even if the Friday morning column
+            # does not explicitly contain the worker name.
+            if shift["column"] == "מחלקה" and row["weekday"] == "שבת":
+                friday_date = row["date"] - timedelta(days=1)
+                friday_start = datetime.combine(friday_date, times_config["friday_morning_start"])
+                friday_end = datetime.combine(friday_date, times_config["friday_morning_end"])
+                key = (selected, friday_start, friday_end, "שישי בוקר במחלקה")
+                if key not in auto_friday_keys:
+                    auto_friday_keys.add(key)
+                    events.append({
+                        "date": friday_date,
+                        "weekday": "שישי",
+                        "shift_type": "שישי בוקר",
+                        "title": "שישי בוקר במחלקה - פנימית ד׳",
+                        "start_dt": friday_start,
+                        "end_dt": friday_end,
+                        "raw_assignment": f"אוטומטי מתורנות מחלקה בשבת ({row['date'].strftime('%d/%m/%Y')})",
+                        "source": "אוטומטי מתורנות שבת",
+                    })
+
+    deduped = []
+    seen = set()
+    for event in events:
+        key = (event["title"], event["start_dt"], event["end_dt"], event["shift_type"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(event)
+
+    deduped.sort(key=lambda item: item["start_dt"])
+    return deduped
 
 
 def _ics_escape(text: str) -> str:
@@ -1868,6 +1932,7 @@ def build_ics(events: List[dict], worker_name: str, calendar_name: str = "תור
             f"תורן/ית: {safe_worker}\\n"
             f"סוג תורנות: {event['shift_type']}\\n"
             f"יום: {event['weekday']}\\n"
+            f"מקור: {event.get('source', 'שיבוץ ישיר')}\\n"
             f"שיבוץ מקורי בקובץ: {event['raw_assignment']}"
         )
 
@@ -1972,13 +2037,14 @@ def render_calendar_save():
             "סוג": event["shift_type"],
             "התחלה": event["start_dt"].strftime("%d/%m/%Y %H:%M"),
             "סיום": event["end_dt"].strftime("%d/%m/%Y %H:%M"),
+            "מקור": event.get("source", "שיבוץ ישיר"),
             "שיבוץ בקובץ": event["raw_assignment"],
         }
         for event in events
     ])
 
     # Reverse technical order to keep visual RTL.
-    preview_order = ["שיבוץ בקובץ", "סיום", "התחלה", "סוג", "יום", "תאריך"]
+    preview_order = ["שיבוץ בקובץ", "מקור", "סיום", "התחלה", "סוג", "יום", "תאריך"]
     st.dataframe(preview_df[preview_order], hide_index=True, use_container_width=True)
 
     ics_content = build_ics(events, worker_name)
