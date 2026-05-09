@@ -45,37 +45,49 @@ def inject_global_rtl_css():
     st.markdown(
         """
         <style>
-        html, body, [class*="css"], .stApp {
-            direction: rtl;
-            text-align: right;
+        html, body, .stApp, [data-testid="stAppViewContainer"] {
+            direction: rtl !important;
+            text-align: right !important;
         }
 
-        /* Sidebar on the right for desktop */
+        .main .block-container {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        h1, h2, h3, h4, h5, h6, p, label {
+            text-align: right !important;
+        }
+
         @media (min-width: 769px) {
             section[data-testid="stSidebar"] {
-                right: 0;
-                left: auto;
-                direction: rtl;
-                text-align: right;
+                right: 0 !important;
+                left: auto !important;
+                direction: rtl !important;
+                text-align: right !important;
                 border-left: 1px solid rgba(49, 51, 63, 0.2);
                 border-right: none;
             }
 
             section[data-testid="stSidebar"] > div,
             div[data-testid="stSidebarContent"] {
-                direction: rtl;
-                text-align: right;
+                direction: rtl !important;
+                text-align: right !important;
+            }
+
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span,
+            section[data-testid="stSidebar"] div {
+                text-align: right !important;
             }
 
             .main .block-container {
-                direction: rtl;
-                text-align: right;
                 padding-right: 2rem;
                 padding-left: 2rem;
             }
         }
 
-        /* Mobile optimization */
         @media (max-width: 768px) {
             .main .block-container {
                 padding: 1rem 0.75rem 4rem 0.75rem;
@@ -96,12 +108,43 @@ def inject_global_rtl_css():
         }
 
         table, textarea, input {
-            direction: rtl;
-            text-align: right;
+            direction: rtl !important;
+            text-align: right !important;
         }
 
         div[data-testid="stHorizontalBlock"] {
-            direction: rtl;
+            direction: rtl !important;
+        }
+
+        div[data-testid="stDataEditor"],
+        div[data-testid="stDataFrame"] {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="grid"],
+        div[data-testid="stDataFrame"] [role="grid"] {
+            direction: rtl !important;
+        }
+
+        div[data-testid="stDataEditor"] [role="columnheader"],
+        div[data-testid="stDataEditor"] [role="gridcell"],
+        div[data-testid="stDataFrame"] [role="columnheader"],
+        div[data-testid="stDataFrame"] [role="gridcell"] {
+            text-align: right !important;
+            justify-content: flex-end !important;
+            direction: rtl !important;
+        }
+
+        button, [role="radiogroup"], [data-testid="stRadio"] {
+            direction: rtl !important;
+            text-align: right !important;
+        }
+
+        [data-testid="stRadio"] label {
+            direction: rtl !important;
+            text-align: right !important;
+            justify-content: flex-start !important;
         }
         </style>
         """,
@@ -368,13 +411,13 @@ def build_month_dataframe(year: int, month: int, events_by_date: Dict[str, List[
     for d in month_dates(year, month):
         rows.append({
             "date": d.isoformat(),
-            "תאריך": d.strftime("%d/%m/%Y"),
-            "יום": hebrew_weekday(d),
-            "חגים / שבתות": holidays.get(d.isoformat(), ""),
-            "אירועים מהיומן": events_to_cell(events_by_date, d),
-            "חסום לתורנות": False,
-            "יום חופש": False,
             "הערה": "",
+            "יום חופש": False,
+            "חסום לתורנות": False,
+            "אירועים מהיומן": events_to_cell(events_by_date, d),
+            "חגים / שבתות": holidays.get(d.isoformat(), ""),
+            "יום": hebrew_weekday(d),
+            "תאריך": d.strftime("%d/%m/%Y"),
         })
 
     return pd.DataFrame(rows)
@@ -569,7 +612,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
     with col_title:
         st.markdown(
-            f"<h2 style='text-align:center'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</h2>",
+            f"<h2 style='text-align:right'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</h2>",
             unsafe_allow_html=True,
         )
 
@@ -597,7 +640,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         key=f"availability_editor_{y}_{m}",
         hide_index=True,
         use_container_width=True,
-        column_order=["תאריך", "יום", "חגים / שבתות", "אירועים מהיומן", "חסום לתורנות", "יום חופש", "הערה"],
+        column_order=["הערה", "יום חופש", "חסום לתורנות", "אירועים מהיומן", "חגים / שבתות", "יום", "תאריך"],
         disabled=["date", "תאריך", "יום", "חגים / שבתות", "אירועים מהיומן"],
         column_config={
             "date": None,
