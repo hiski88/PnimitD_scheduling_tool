@@ -35,6 +35,55 @@ DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_FILE = DATA_DIR / "availability_submissions.jsonl"
 
+CALENDAR_EVENTS_CACHE_FILE = DATA_DIR / "calendar_events_cache.json"
+
+
+def load_calendar_event_cache() -> Dict[str, List[str]]:
+    try:
+        if CALENDAR_EVENTS_CACHE_FILE.exists():
+            with CALENDAR_EVENTS_CACHE_FILE.open("r", encoding="utf-8") as f:
+                payload = json.load(f)
+            if isinstance(payload, dict):
+                return {
+                    str(date_key): [str(item) for item in items]
+                    for date_key, items in payload.items()
+                    if isinstance(items, list)
+                }
+    except Exception:
+        pass
+    return {}
+
+
+def save_calendar_event_cache(events_by_date: Dict[str, List[str]]) -> None:
+    try:
+        DATA_DIR.mkdir(exist_ok=True)
+        with CALENDAR_EVENTS_CACHE_FILE.open("w", encoding="utf-8") as f:
+            json.dump(events_by_date, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def clear_calendar_event_cache() -> None:
+    try:
+        if CALENDAR_EVENTS_CACHE_FILE.exists():
+            CALENDAR_EVENTS_CACHE_FILE.unlink()
+    except Exception:
+        pass
+
+
+def merge_calendar_events(existing_events: Dict[str, List[str]], new_events: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    merged_events = {}
+    all_dates = set(existing_events.keys()) | set(new_events.keys())
+
+    for date_key in all_dates:
+        combined = []
+        combined.extend(existing_events.get(date_key, []))
+        combined.extend(new_events.get(date_key, []))
+        merged_events[date_key] = list(dict.fromkeys(combined))
+
+    return merged_events
+
+
 st.set_page_config(
     page_title="מע׳ לתכנון תורנויות- פנימית ד׳",
     page_icon="🗓️",
@@ -457,6 +506,11 @@ def default_next_month() -> Tuple[int, int]:
 def default_previous_month() -> Tuple[int, int]:
     today = date.today()
     return add_months(today.year, today.month, -1)
+
+
+def default_current_month() -> Tuple[int, int]:
+    today = date.today()
+    return today.year, today.month
 
 
 def month_dates(year: int, month: int) -> List[date]:
@@ -989,7 +1043,7 @@ def init_state():
         st.session_state["selected_month"] = m
 
     if "events_by_date" not in st.session_state:
-        st.session_state["events_by_date"] = {}
+        st.session_state["events_by_date"] = load_calendar_event_cache()
 
 
 def move_month(delta: int):
@@ -1174,31 +1228,27 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                                     st.session_state["selected_month"],
                                 )
 
-                                existing_events = st.session_state.get("events_by_date", {})
-                                merged_events = {}
-
-                                all_dates = set(existing_events.keys()) | set(new_events.keys())
-
-                                for date_key in all_dates:
-                                    combined = []
-                                    combined.extend(existing_events.get(date_key, []))
-                                    combined.extend(new_events.get(date_key, []))
-
-                                    # Remove duplicates while preserving order
-                                    unique_events = list(dict.fromkeys(combined))
-                                    merged_events[date_key] = unique_events
+                                existing_events = merge_calendar_events(
+                                    load_calendar_event_cache(),
+                                    st.session_state.get("events_by_date", {}),
+                                )
+                                merged_events = merge_calendar_events(existing_events, new_events)
 
                                 st.session_state["events_by_date"] = merged_events
+                                save_calendar_event_cache(merged_events)
                                 st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
 
                                 added_count = sum(len(v) for v in new_events.values())
-                                st.success(f"נוספו {added_count} אירועים מהיומנים שנבחרו.")
+                                total_count = sum(len(v) for v in merged_events.values())
+                                st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
 
                         if st.button("נקה אירועים מהטבלה"):
                             st.session_state["events_by_date"] = {}
+                            clear_calendar_event_cache()
                             st.success("האירועים נוקו מהטבלה.")
 
                         if st.button("נתק חיבור ליומן"):
+                            save_calendar_event_cache(st.session_state.get("events_by_date", {}))
                             st.session_state.pop("google_credentials", None)
                             st.info("החיבור נותק. האירועים שכבר נטענו נשארו בטבלה ולא יימחקו.")
                             st.rerun()
@@ -2027,7 +2077,7 @@ def render_calendar_save():
         help="הקובץ צריך לכלול את עמודות: יום בחודש, יום בשבוע, מחלקה, מיון, שישי בוקר.",
     )
 
-    default_y, default_m = default_previous_month()
+    default_y, default_m = default_current_month()
     col_year, col_month = st.columns(2)
     with col_year:
         selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1, key="ics_year")
