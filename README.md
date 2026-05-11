@@ -223,3 +223,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - ניתוק יומן כבר לא מפעיל rerun ידני.
 - שם העובד/ת נשמר דרך session key יציב.
 - לאחר חזרה מ-Google, האירועים המקומיים ממוזגים חזרה ל-session.
+
+
+## תיקון כפתור Google Calendar
+
+- הוחזר כפתור ההתחברות ל-st.link_button תקני של Streamlit.
+- כפתור HTML מותאם הוסר כי הוא עלול להיחסם בתוך iframe.
+- שמירת המצב המקומית נשארת כרכיב autosave נפרד.

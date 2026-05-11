@@ -1326,42 +1326,6 @@ def move_month(delta: int):
 
 
 
-def render_google_connect_button(auth_url: str):
-    events_payload = json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False)
-    employee_payload = st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", "") or ""
-
-    components.html(
-        f"""
-        <div dir="rtl" style="text-align:right; font-family:Arial, sans-serif;">
-            <button
-                onclick='
-                    try {{
-                        localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(events_payload)});
-                        localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(employee_payload, ensure_ascii=False)});
-                    }} catch (e) {{}}
-                    window.top.location.href = {json.dumps(auth_url)};
-                '
-                style="
-                    background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-                    color:white;
-                    border:none;
-                    border-radius:10px;
-                    padding:0.65rem 1.1rem;
-                    cursor:pointer;
-                    font-size:1rem;
-                    font-weight:700;
-                    width:100%;
-                    min-height:46px;
-                "
-            >
-                התחבר ל-Google Calendar
-            </button>
-        </div>
-        """,
-        height=58,
-    )
-
-
 def render_copy_button(text_to_copy: str, button_label: str = "העתק"):
     escaped = json.dumps(text_to_copy, ensure_ascii=False)
     components.html(
@@ -1545,8 +1509,21 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
             if "google_credentials" not in st.session_state:
                 auth_url = start_google_oauth()
+
+                components.html(
+                    f"""
+                    <script>
+                    try {{
+                        localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False))});
+                        localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""), ensure_ascii=False)});
+                    }} catch (e) {{}}
+                    </script>
+                    """,
+                    height=0,
+                )
                 if auth_url:
-                    render_google_connect_button(auth_url)
+                    st.caption("לפני מעבר ל-Google, הנתונים המקומיים נשמרים בדפדפן.")
+                    st.link_button("התחבר ל-Google Calendar", auth_url, use_container_width=True)
             else:
                 st.success("מחובר ל-Google Calendar")
                 try:
