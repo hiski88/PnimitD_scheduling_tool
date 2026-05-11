@@ -1325,6 +1325,43 @@ def move_month(delta: int):
 
 
 
+
+def render_google_connect_button(auth_url: str):
+    events_payload = json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False)
+    employee_payload = st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", "") or ""
+
+    components.html(
+        f"""
+        <div dir="rtl" style="text-align:right; font-family:Arial, sans-serif;">
+            <button
+                onclick='
+                    try {{
+                        localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(events_payload)});
+                        localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(employee_payload, ensure_ascii=False)});
+                    }} catch (e) {{}}
+                    window.top.location.href = {json.dumps(auth_url)};
+                '
+                style="
+                    background:linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                    color:white;
+                    border:none;
+                    border-radius:10px;
+                    padding:0.65rem 1.1rem;
+                    cursor:pointer;
+                    font-size:1rem;
+                    font-weight:700;
+                    width:100%;
+                    min-height:46px;
+                "
+            >
+                התחבר ל-Google Calendar
+            </button>
+        </div>
+        """,
+        height=58,
+    )
+
+
 def render_copy_button(text_to_copy: str, button_label: str = "העתק"):
     escaped = json.dumps(text_to_copy, ensure_ascii=False)
     components.html(
@@ -1431,15 +1468,30 @@ def render_shift_planning():
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
+        if "employee_name_input" not in st.session_state:
+            st.session_state["employee_name_input"] = st.session_state.get("employee_name", "") or load_employee_name_from_browser()
+
         employee_name = st.text_input(
             "שם העובד/ת",
-            value=st.session_state.get("employee_name", ""),
             placeholder="הקלד/י שם מלא",
             key="employee_name_input",
         )
         st.session_state["employee_name"] = employee_name
         save_employee_name_to_browser(employee_name)
         person_id = employee_name
+
+        components.html(
+            f"""
+            <script>
+            try {{
+                localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False))});
+                localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""), ensure_ascii=False)});
+            }} catch (e) {{}}
+            </script>
+            """,
+            height=0,
+        )
+
 
         st.divider()
         st.subheader("חיבור יומנים אישיים")
@@ -1474,11 +1526,18 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             if code and "google_credentials" not in st.session_state:
                 try:
                     if finish_google_oauth(code):
+                        browser_events = load_calendar_events_from_browser()
                         st.session_state["events_by_date"] = merge_calendar_events(
-                            load_calendar_events_from_browser(),
+                            browser_events,
                             st.session_state.get("events_by_date", {}),
                         )
-                        st.session_state["employee_name"] = load_employee_name_from_browser() or st.session_state.get("employee_name", "")
+                        st.session_state["employee_name"] = (
+                            load_employee_name_from_browser()
+                            or st.session_state.get("employee_name", "")
+                            or st.session_state.get("employee_name_input", "")
+                        )
+                        save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
+                        save_employee_name_to_browser(st.session_state.get("employee_name", ""))
                         st.success("החיבור ליומן הושלם.")
                 except Exception as e:
                     st.error(f"שגיאה בהשלמת החיבור: {e}")
@@ -1487,7 +1546,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             if "google_credentials" not in st.session_state:
                 auth_url = start_google_oauth()
                 if auth_url:
-                    st.link_button("התחבר ל-Google Calendar", auth_url)
+                    render_google_connect_button(auth_url)
             else:
                 st.success("מחובר ל-Google Calendar")
                 try:
@@ -1512,7 +1571,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         if not selected_calendar_ids:
                             st.warning("יש לבחור לפחות יומן אחד.")
                         else:
-                            save_employee_name_to_browser(st.session_state.get("employee_name", ""))
+                            save_employee_name_to_browser(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""))
                             new_events = read_google_events(
                                 selected_calendar_ids,
                                 st.session_state["selected_year"],
