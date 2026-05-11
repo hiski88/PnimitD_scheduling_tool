@@ -41,6 +41,7 @@ DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_FILE = DATA_DIR / "availability_submissions.jsonl"
 
 CALENDAR_LOCAL_STORAGE_KEY = "medstaff_calendar_events_by_date_v1"
+EMPLOYEE_NAME_LOCAL_STORAGE_KEY = "medstaff_employee_name_v1"
 
 
 def merge_calendar_events(existing_events: Dict[str, List[str]], new_events: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -678,10 +679,83 @@ def inject_global_rtl_css():
             }
         }
 
+
+        /* Final mobile sidebar override: do not force right sidebar on phones */
+        @media (max-width: 768px) {
+            section[data-testid="stSidebar"] {
+                position: fixed !important;
+                left: 0 !important;
+                right: auto !important;
+                width: min(92vw, 360px) !important;
+                min-width: min(92vw, 360px) !important;
+                max-width: min(92vw, 360px) !important;
+                direction: rtl !important;
+                text-align: right !important;
+                overflow-x: hidden !important;
+            }
+
+            div[data-testid="stSidebarContent"] {
+                width: 100% !important;
+                max-width: 100% !important;
+                overflow-x: hidden !important;
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+            }
+
+            section[data-testid="stSidebar"] div,
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span {
+                max-width: 100% !important;
+                white-space: normal !important;
+                overflow-wrap: break-word !important;
+                word-break: normal !important;
+            }
+
+            [data-testid="collapsedControl"] {
+                left: 0.6rem !important;
+                right: auto !important;
+            }
+        }
+
+        @media (max-width: 900px) and (orientation: landscape) {
+            section[data-testid="stSidebar"] {
+                width: min(86vw, 420px) !important;
+                max-width: min(86vw, 420px) !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+def load_employee_name_from_browser() -> str:
+    if streamlit_js_eval is None:
+        return ""
+
+    try:
+        value = streamlit_js_eval(
+            js_expressions=f"localStorage.getItem('{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}')",
+            key="load_employee_name_local_storage",
+        )
+        return str(value or "")
+    except Exception:
+        return ""
+
+
+def save_employee_name_to_browser(employee_name: str) -> None:
+    if streamlit_js_eval is None:
+        return
+
+    try:
+        streamlit_js_eval(
+            js_expressions=f"localStorage.setItem('{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}', {json.dumps(employee_name or '', ensure_ascii=False)});",
+            key="save_employee_name_local_storage",
+        )
+    except Exception:
+        pass
+
 
 # =========================
 # Date helpers
@@ -1240,6 +1314,9 @@ def init_state():
     if "events_by_date" not in st.session_state:
         st.session_state["events_by_date"] = load_calendar_events_from_browser()
 
+    if "employee_name" not in st.session_state:
+        st.session_state["employee_name"] = load_employee_name_from_browser()
+
 
 def move_month(delta: int):
     y, m = add_months(st.session_state["selected_year"], st.session_state["selected_month"], delta)
@@ -1354,7 +1431,14 @@ def render_shift_planning():
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
-        employee_name = st.text_input("שם העובד/ת", value="", placeholder="הקלד/י שם מלא")
+        employee_name = st.text_input(
+            "שם העובד/ת",
+            value=st.session_state.get("employee_name", ""),
+            placeholder="הקלד/י שם מלא",
+            key="employee_name_input",
+        )
+        st.session_state["employee_name"] = employee_name
+        save_employee_name_to_browser(employee_name)
         person_id = employee_name
 
         st.divider()
@@ -1390,6 +1474,11 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             if code and "google_credentials" not in st.session_state:
                 try:
                     if finish_google_oauth(code):
+                        st.session_state["events_by_date"] = merge_calendar_events(
+                            load_calendar_events_from_browser(),
+                            st.session_state.get("events_by_date", {}),
+                        )
+                        st.session_state["employee_name"] = load_employee_name_from_browser() or st.session_state.get("employee_name", "")
                         st.success("החיבור ליומן הושלם.")
                 except Exception as e:
                     st.error(f"שגיאה בהשלמת החיבור: {e}")
@@ -1417,12 +1506,13 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                     )
                     selected_calendar_ids = [options[label] for label in selected_labels]
 
-                    st.caption("האירועים יוצגו עם שעה ושם היומן. טעינת יומן נוסף תתווסף לאירועים שכבר נטענו.")
+                    st.caption("האירועים יוצגו עם שעה ושם היומן. טעינת יומן נוסף תתווסף לאירועים שכבר נטענו. הנתונים נשמרים במכשיר הנוכחי בלבד.")
 
                     if st.button("טען אירועים מכל היומנים שנבחרו"):
                         if not selected_calendar_ids:
                             st.warning("יש לבחור לפחות יומן אחד.")
                         else:
+                            save_employee_name_to_browser(st.session_state.get("employee_name", ""))
                             new_events = read_google_events(
                                 selected_calendar_ids,
                                 st.session_state["selected_year"],
