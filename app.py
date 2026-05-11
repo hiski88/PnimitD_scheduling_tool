@@ -46,8 +46,19 @@ DEVICE_CACHE_DIR.mkdir(exist_ok=True)
 
 
 def get_device_id() -> str:
+    # Google OAuth returns the `state` parameter to the app after login.
+    # We use it to restore the same device cache after OAuth creates a fresh Streamlit session.
+    try:
+        state_device_id = st.query_params.get("state")
+        if state_device_id:
+            st.session_state["device_id"] = str(state_device_id)
+            return st.session_state["device_id"]
+    except Exception:
+        pass
+
     if "device_id" not in st.session_state:
         st.session_state["device_id"] = str(uuid.uuid4())
+
     return st.session_state["device_id"]
 
 
@@ -996,10 +1007,19 @@ def start_google_oauth() -> Optional[str]:
     if flow is None:
         return None
 
+    device_id = get_device_id()
+
+    # Persist the current screen state before sending the user to Google.
+    save_device_calendar_state(
+        st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
+        st.session_state.get("events_by_date", {}),
+    )
+
     auth_url, state = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
         prompt="consent",
+        state=device_id,
     )
     st.session_state["google_oauth_state"] = state
     return auth_url
@@ -1008,6 +1028,14 @@ def start_google_oauth() -> Optional[str]:
 def finish_google_oauth(code: str) -> bool:
     if Flow is None:
         return False
+
+    # Restore device id before query params are cleared.
+    try:
+        state_device_id = st.query_params.get("state")
+        if state_device_id:
+            st.session_state["device_id"] = str(state_device_id)
+    except Exception:
+        pass
 
     flow = _new_google_flow()
     if flow is None:
@@ -1575,7 +1603,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                     height=0,
                 )
                 if auth_url:
-                    st.caption("לפני מעבר ל-Google, הנתונים המקומיים נשמרים בדפדפן.")
+                    st.caption("לפני מעבר ל-Google, האירועים שכבר נטענו נשמרים כדי שאפשר יהיה להוסיף יומן נוסף.")
                     st.link_button("התחבר ל-Google Calendar", auth_url, use_container_width=True)
             else:
                 st.success("מחובר ל-Google Calendar")
@@ -1636,7 +1664,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
                         st.session_state.pop("google_credentials", None)
                         st.info("החיבור נותק. האירועים שכבר נטענו נשארו במכשיר הזה ולא יימחקו.")
-                        st.rerun()
+                        # rerun intentionally avoided to preserve state
                 except Exception as e:
                     st.error(f"שגיאה בקריאת יומנים: {e}")
 
@@ -1646,7 +1674,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
     with nav_right:
         if st.button("חודש קודם ←", use_container_width=True):
             move_month(-1)
-            st.rerun()
+            # rerun intentionally avoided to preserve state
     with nav_center:
         render_month_nav_card(st.session_state["selected_year"], st.session_state["selected_month"])
     with nav_left:
@@ -1654,13 +1682,13 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         with nav_a:
             if st.button("→ חודש הבא", use_container_width=True):
                 move_month(1)
-                st.rerun()
+                # rerun intentionally avoided to preserve state
         with nav_b:
             if st.button("📅 חזור לחודש הבא", use_container_width=True):
                 y, m = default_next_month()
                 st.session_state["selected_year"] = y
                 st.session_state["selected_month"] = m
-                st.rerun()
+                # rerun intentionally avoided to preserve state
 
     y = st.session_state["selected_year"]
     m = st.session_state["selected_month"]
