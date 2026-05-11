@@ -17,6 +17,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 try:
+    from streamlit_js_eval import streamlit_js_eval
+except Exception:
+    streamlit_js_eval = None
+
+try:
     from google_auth_oauthlib.flow import Flow
     from google.oauth2.credentials import Credentials
     from googleapiclient.discovery import build
@@ -35,40 +40,7 @@ DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_FILE = DATA_DIR / "availability_submissions.jsonl"
 
-CALENDAR_EVENTS_CACHE_FILE = DATA_DIR / "calendar_events_cache.json"
-
-
-def load_calendar_event_cache() -> Dict[str, List[str]]:
-    try:
-        if CALENDAR_EVENTS_CACHE_FILE.exists():
-            with CALENDAR_EVENTS_CACHE_FILE.open("r", encoding="utf-8") as f:
-                payload = json.load(f)
-            if isinstance(payload, dict):
-                return {
-                    str(date_key): [str(item) for item in items]
-                    for date_key, items in payload.items()
-                    if isinstance(items, list)
-                }
-    except Exception:
-        pass
-    return {}
-
-
-def save_calendar_event_cache(events_by_date: Dict[str, List[str]]) -> None:
-    try:
-        DATA_DIR.mkdir(exist_ok=True)
-        with CALENDAR_EVENTS_CACHE_FILE.open("w", encoding="utf-8") as f:
-            json.dump(events_by_date, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
-
-def clear_calendar_event_cache() -> None:
-    try:
-        if CALENDAR_EVENTS_CACHE_FILE.exists():
-            CALENDAR_EVENTS_CACHE_FILE.unlink()
-    except Exception:
-        pass
+CALENDAR_LOCAL_STORAGE_KEY = "medstaff_calendar_events_by_date_v1"
 
 
 def merge_calendar_events(existing_events: Dict[str, List[str]], new_events: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -82,6 +54,60 @@ def merge_calendar_events(existing_events: Dict[str, List[str]], new_events: Dic
         merged_events[date_key] = list(dict.fromkeys(combined))
 
     return merged_events
+
+
+def load_calendar_events_from_browser() -> Dict[str, List[str]]:
+    if streamlit_js_eval is None:
+        return {}
+
+    try:
+        raw_value = streamlit_js_eval(
+            js_expressions=f"localStorage.getItem('{CALENDAR_LOCAL_STORAGE_KEY}')",
+            key="load_calendar_events_local_storage",
+        )
+        if not raw_value:
+            return {}
+
+        payload = json.loads(raw_value)
+        if not isinstance(payload, dict):
+            return {}
+
+        return {
+            str(date_key): [str(item) for item in items]
+            for date_key, items in payload.items()
+            if isinstance(items, list)
+        }
+    except Exception:
+        return {}
+
+
+def save_calendar_events_to_browser(events_by_date: Dict[str, List[str]]) -> None:
+    if streamlit_js_eval is None:
+        return
+
+    try:
+        payload = json.dumps(events_by_date, ensure_ascii=False)
+        streamlit_js_eval(
+            js_expressions=f"localStorage.setItem('{CALENDAR_LOCAL_STORAGE_KEY}', {json.dumps(payload)});",
+            key="save_calendar_events_local_storage",
+        )
+    except Exception:
+        pass
+
+
+def clear_calendar_events_from_browser() -> None:
+    if streamlit_js_eval is None:
+        return
+
+    try:
+        streamlit_js_eval(
+            js_expressions=f"localStorage.removeItem('{CALENDAR_LOCAL_STORAGE_KEY}');",
+            key="clear_calendar_events_local_storage",
+        )
+    except Exception:
+        pass
+
+
 
 
 st.set_page_config(
@@ -481,6 +507,175 @@ def inject_global_rtl_css():
 
         .bottom-actions-row {
             direction: rtl !important;
+        }
+
+
+        /* Tablet layout */
+        @media (min-width: 769px) and (max-width: 1180px) {
+            .main .block-container {
+                padding: 1.2rem 1rem 4rem 1rem !important;
+                max-width: 100% !important;
+            }
+
+            section[data-testid="stSidebar"] {
+                width: 280px !important;
+                min-width: 280px !important;
+            }
+
+            .tool-hero h1 {
+                font-size: 1.55rem !important;
+            }
+
+            .month-nav-grid,
+            .summary-stat-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+        }
+
+        /* Phone layout */
+        @media (max-width: 768px) {
+            html, body, .stApp {
+                overflow-x: hidden !important;
+            }
+
+            .main .block-container {
+                padding: 0.75rem 0.6rem 5rem 0.6rem !important;
+                max-width: 100% !important;
+            }
+
+            section[data-testid="stSidebar"] {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            section[data-testid="stSidebar"] * {
+                white-space: normal !important;
+                overflow-wrap: anywhere !important;
+                word-break: normal !important;
+                line-height: 1.35 !important;
+            }
+
+            section[data-testid="stSidebar"] h1,
+            section[data-testid="stSidebar"] h2,
+            section[data-testid="stSidebar"] h3 {
+                font-size: 1.05rem !important;
+            }
+
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span {
+                font-size: 0.92rem !important;
+            }
+
+            .tool-hero {
+                padding: 0.9rem !important;
+                margin-bottom: 0.75rem !important;
+            }
+
+            .tool-hero h1 {
+                font-size: 1.35rem !important;
+            }
+
+            .tool-hero p {
+                font-size: 0.9rem !important;
+            }
+
+            .month-nav-card,
+            .choices-panel,
+            .summary-box {
+                padding: 0.85rem !important;
+                border-radius: 16px !important;
+                margin-top: 0.7rem !important;
+            }
+
+            .month-title-big {
+                font-size: 1.35rem !important;
+            }
+
+            .month-icon {
+                width: 44px !important;
+                height: 44px !important;
+                font-size: 1.15rem !important;
+            }
+
+            .month-center {
+                border-left: none !important;
+                border-right: none !important;
+                padding: 0 !important;
+            }
+
+            .summary-stat-grid {
+                grid-template-columns: 1fr 1fr !important;
+                gap: 0.55rem !important;
+            }
+
+            .summary-card {
+                min-height: 74px !important;
+                padding: 0.75rem !important;
+            }
+
+            .summary-card-label,
+            .summary-card-sub {
+                font-size: 0.76rem !important;
+            }
+
+            .summary-card-value {
+                font-size: 1.1rem !important;
+            }
+
+            .summary-icon {
+                font-size: 1.25rem !important;
+            }
+
+            div[data-testid="stDataEditor"],
+            div[data-testid="stDataFrame"] {
+                max-width: 100vw !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            div[data-testid="stDataEditor"] [role="grid"],
+            div[data-testid="stDataFrame"] [role="grid"] {
+                min-width: 780px !important;
+            }
+
+            button {
+                min-height: 46px !important;
+                font-size: 0.95rem !important;
+                padding: 0.55rem 0.75rem !important;
+            }
+
+            textarea {
+                min-height: 120px !important;
+                font-size: 0.92rem !important;
+            }
+
+            input {
+                min-height: 42px !important;
+                font-size: 0.95rem !important;
+            }
+
+            div[data-baseweb="select"] {
+                max-width: 100% !important;
+            }
+
+            div[data-baseweb="tag"] {
+                max-width: 100% !important;
+                margin: 0.15rem !important;
+            }
+
+            div[data-baseweb="tag"] span {
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                white-space: nowrap !important;
+                max-width: 230px !important;
+            }
+
+            .bottom-actions-row,
+            .action-row {
+                grid-template-columns: 1fr !important;
+            }
         }
 
         </style>
@@ -1043,7 +1238,7 @@ def init_state():
         st.session_state["selected_month"] = m
 
     if "events_by_date" not in st.session_state:
-        st.session_state["events_by_date"] = load_calendar_event_cache()
+        st.session_state["events_by_date"] = load_calendar_events_from_browser()
 
 
 def move_month(delta: int):
@@ -1165,6 +1360,8 @@ def render_shift_planning():
         st.divider()
         st.subheader("חיבור יומנים אישיים")
         st.caption("Google Calendar, קריאה בלבד. ניתן לבחור כמה יומנים, להסיר יומנים לא רצויים ואז לטעון אירועים.")
+        if streamlit_js_eval is None:
+            st.warning("שמירה מקומית בדפדפן אינה זמינה כי חסרה הספרייה streamlit-js-eval. האירועים יישמרו רק עד רענון הדף.")
 
         if not google_is_configured():
             st.warning("Google Calendar לא מוגדר עדיין.")
@@ -1232,29 +1429,30 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                                 st.session_state["selected_month"],
                             )
 
+                            browser_events = load_calendar_events_from_browser()
                             existing_events = merge_calendar_events(
-                                load_calendar_event_cache(),
+                                browser_events,
                                 st.session_state.get("events_by_date", {}),
                             )
                             merged_events = merge_calendar_events(existing_events, new_events)
 
                             st.session_state["events_by_date"] = merged_events
-                            save_calendar_event_cache(merged_events)
+                            save_calendar_events_to_browser(merged_events)
                             st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
 
                             added_count = sum(len(v) for v in new_events.values())
                             total_count = sum(len(v) for v in merged_events.values())
                             st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
 
-                    if st.button("נקה אירועים מהטבלה"):
+                    if st.button("נקה אירועים מהמכשיר הזה"):
                         st.session_state["events_by_date"] = {}
-                        clear_calendar_event_cache()
-                        st.success("האירועים נוקו מהטבלה.")
+                        clear_calendar_events_from_browser()
+                        st.success("האירועים נוקו מהמכשיר הנוכחי בלבד.")
 
                     if st.button("נתק חיבור ליומן"):
-                        save_calendar_event_cache(st.session_state.get("events_by_date", {}))
+                        save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
                         st.session_state.pop("google_credentials", None)
-                        st.info("החיבור נותק. האירועים שכבר נטענו נשארו בטבלה ולא יימחקו.")
+                        st.info("החיבור נותק. האירועים שכבר נטענו נשארו במכשיר הזה ולא יימחקו.")
                         st.rerun()
                 except Exception as e:
                     st.error(f"שגיאה בקריאת יומנים: {e}")
