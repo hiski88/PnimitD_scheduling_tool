@@ -230,3 +230,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - הוחזר כפתור ההתחברות ל-st.link_button תקני של Streamlit.
 - כפתור HTML מותאם הוסר כי הוא עלול להיחסם בתוך iframe.
 - שמירת המצב המקומית נשארת כרכיב autosave נפרד.
+
+
+## Device-scoped cache fix
+
+- נוסף cache פרטי לפי מכשיר.
+- אירועים אמורים להישמר גם לאחר חיבור יומן נוסף.
+- שם העובד/ת נשמר יחד עם האירועים.

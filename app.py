@@ -1,5 +1,6 @@
 import calendar
 import json
+import uuid
 import re
 from io import BytesIO
 from datetime import date, datetime, time, timedelta, timezone
@@ -39,6 +40,56 @@ SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(exist_ok=True)
 OUTPUT_FILE = DATA_DIR / "availability_submissions.jsonl"
+
+DEVICE_CACHE_DIR = DATA_DIR / "device_calendar_cache"
+DEVICE_CACHE_DIR.mkdir(exist_ok=True)
+
+
+def get_device_id() -> str:
+    if "device_id" not in st.session_state:
+        st.session_state["device_id"] = str(uuid.uuid4())
+    return st.session_state["device_id"]
+
+
+def get_device_cache_path(device_id: str) -> Path:
+    return DEVICE_CACHE_DIR / f"{device_id}.json"
+
+
+def load_device_calendar_state() -> dict:
+    device_id = get_device_id()
+    path = get_device_cache_path(device_id)
+
+    if not path.exists():
+        return {
+            "employee_name": "",
+            "events_by_date": {},
+        }
+
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {
+            "employee_name": "",
+            "events_by_date": {},
+        }
+
+
+def save_device_calendar_state(employee_name: str, events_by_date: dict):
+    device_id = get_device_id()
+    path = get_device_cache_path(device_id)
+
+    payload = {
+        "employee_name": employee_name or "",
+        "events_by_date": events_by_date or {},
+    }
+
+    try:
+        with path.open("w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 
 CALENDAR_LOCAL_STORAGE_KEY = "medstaff_calendar_events_by_date_v1"
 EMPLOYEE_NAME_LOCAL_STORAGE_KEY = "medstaff_employee_name_v1"
@@ -1311,11 +1362,13 @@ def init_state():
         st.session_state["selected_year"] = y
         st.session_state["selected_month"] = m
 
+    cache_payload = load_device_calendar_state()
+
     if "events_by_date" not in st.session_state:
-        st.session_state["events_by_date"] = load_calendar_events_from_browser()
+        st.session_state["events_by_date"] = cache_payload.get("events_by_date", {})
 
     if "employee_name" not in st.session_state:
-        st.session_state["employee_name"] = load_employee_name_from_browser()
+        st.session_state["employee_name"] = cache_payload.get("employee_name", "")
 
 
 def move_month(delta: int):
@@ -1441,7 +1494,7 @@ def render_shift_planning():
             key="employee_name_input",
         )
         st.session_state["employee_name"] = employee_name
-        save_employee_name_to_browser(employee_name)
+        save_device_calendar_state(employee_name, st.session_state.get("events_by_date", {}))
         person_id = employee_name
 
         components.html(
@@ -1563,7 +1616,11 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             merged_events = merge_calendar_events(existing_events, new_events)
 
                             st.session_state["events_by_date"] = merged_events
-                            save_calendar_events_to_browser(merged_events)
+
+                            save_device_calendar_state(
+                                st.session_state.get("employee_name", ""),
+                                merged_events,
+                            )
                             st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
 
                             added_count = sum(len(v) for v in new_events.values())
