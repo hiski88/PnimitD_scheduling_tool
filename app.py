@@ -43,10 +43,31 @@ OUTPUT_FILE = DATA_DIR / "availability_submissions.jsonl"
 
 DEVICE_CACHE_DIR = DATA_DIR / "device_calendar_cache"
 DEVICE_CACHE_DIR.mkdir(exist_ok=True)
+DEVICE_CACHE_TTL_HOURS = 12
 
+
+
+
+
+def cleanup_expired_device_cache() -> None:
+    """Delete device cache files older than DEVICE_CACHE_TTL_HOURS."""
+    try:
+        now_ts = datetime.now().timestamp()
+        max_age_seconds = DEVICE_CACHE_TTL_HOURS * 60 * 60
+
+        for path in DEVICE_CACHE_DIR.glob("*.json"):
+            try:
+                age_seconds = now_ts - path.stat().st_mtime
+                if age_seconds > max_age_seconds:
+                    path.unlink()
+            except Exception:
+                pass
+    except Exception:
+        pass
 
 def get_device_id() -> str:
-    """Return a stable device id across normal refreshes and Google OAuth callbacks."""
+    # Google OAuth returns the `state` parameter to the app after login.
+    # We use it to restore the same device cache after OAuth creates a fresh Streamlit session.
     try:
         state_device_id = st.query_params.get("state")
         if state_device_id:
@@ -55,22 +76,8 @@ def get_device_id() -> str:
     except Exception:
         pass
 
-    try:
-        query_device_id = st.query_params.get("device_id")
-        if query_device_id:
-            st.session_state["device_id"] = str(query_device_id)
-            return st.session_state["device_id"]
-    except Exception:
-        pass
-
     if "device_id" not in st.session_state:
         st.session_state["device_id"] = str(uuid.uuid4())
-
-    try:
-        if st.query_params.get("device_id") != st.session_state["device_id"]:
-            st.query_params["device_id"] = st.session_state["device_id"]
-    except Exception:
-        pass
 
     return st.session_state["device_id"]
 
@@ -78,6 +85,17 @@ def get_device_id() -> str:
 def get_device_cache_path(device_id: str) -> Path:
     return DEVICE_CACHE_DIR / f"{device_id}.json"
 
+
+
+
+def clear_current_device_cache() -> None:
+    try:
+        device_id = get_device_id()
+        path = get_device_cache_path(device_id)
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
 
 def load_device_calendar_state() -> dict:
     device_id = get_device_id()
@@ -88,6 +106,17 @@ def load_device_calendar_state() -> dict:
             "employee_name": "",
             "events_by_date": {},
         }
+
+    try:
+        age_seconds = datetime.now().timestamp() - path.stat().st_mtime
+        if age_seconds > DEVICE_CACHE_TTL_HOURS * 60 * 60:
+            path.unlink()
+            return {
+                "employee_name": "",
+                "events_by_date": {},
+            }
+    except Exception:
+        pass
 
     try:
         with path.open("r", encoding="utf-8") as f:
@@ -1069,10 +1098,7 @@ def finish_google_oauth(code: str) -> bool:
     st.session_state.pop("google_oauth_state", None)
 
     try:
-        device_id = st.session_state.get("device_id")
         st.query_params.clear()
-        if device_id:
-            st.query_params["device_id"] = device_id
     except Exception:
         pass
 
@@ -1587,25 +1613,18 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             if code and "google_credentials" not in st.session_state:
                 try:
                     if finish_google_oauth(code):
-                        cache_payload = load_device_calendar_state()
-
+                        browser_events = load_calendar_events_from_browser()
                         st.session_state["events_by_date"] = merge_calendar_events(
-                            cache_payload.get("events_by_date", {}),
+                            browser_events,
                             st.session_state.get("events_by_date", {}),
                         )
-
                         st.session_state["employee_name"] = (
-                            cache_payload.get("employee_name", "")
+                            load_employee_name_from_browser()
                             or st.session_state.get("employee_name", "")
                             or st.session_state.get("employee_name_input", "")
                         )
-                        st.session_state["employee_name_input"] = st.session_state.get("employee_name", "")
-
-                        save_device_calendar_state(
-                            st.session_state.get("employee_name", ""),
-                            st.session_state.get("events_by_date", {}),
-                        )
-
+                        save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
+                        save_employee_name_to_browser(st.session_state.get("employee_name", ""))
                         st.success("החיבור ליומן הושלם.")
                 except Exception as e:
                     st.error(f"שגיאה בהשלמת החיבור: {e}")
@@ -1652,20 +1671,16 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         if not selected_calendar_ids:
                             st.warning("יש לבחור לפחות יומן אחד.")
                         else:
-                            save_device_calendar_state(
-                                st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
-                                st.session_state.get("events_by_date", {}),
-                            )
-
+                            save_employee_name_to_browser(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""))
                             new_events = read_google_events(
                                 selected_calendar_ids,
                                 st.session_state["selected_year"],
                                 st.session_state["selected_month"],
                             )
 
-                            cache_payload = load_device_calendar_state()
+                            browser_events = load_calendar_events_from_browser()
                             existing_events = merge_calendar_events(
-                                cache_payload.get("events_by_date", {}),
+                                browser_events,
                                 st.session_state.get("events_by_date", {}),
                             )
                             merged_events = merge_calendar_events(existing_events, new_events)
@@ -1673,7 +1688,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             st.session_state["events_by_date"] = merged_events
 
                             save_device_calendar_state(
-                                st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
+                                st.session_state.get("employee_name", ""),
                                 merged_events,
                             )
                             st.session_state["selected_calendar_count"] = len(selected_calendar_ids)
@@ -1683,21 +1698,15 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
 
                     if st.button("נקה אירועים מהמכשיר הזה"):
-                            st.session_state["events_by_date"] = {}
-                            save_device_calendar_state(
-                                st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
-                                {},
-                            )
-                            st.success("האירועים נוקו מהמכשיר הנוכחי בלבד.")
+                        st.session_state["events_by_date"] = {}
+                        clear_calendar_events_from_browser()
+                        st.success("האירועים נוקו מהמכשיר הנוכחי בלבד.")
 
                     if st.button("נתק חיבור ליומן"):
-                            save_device_calendar_state(
-                                st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
-                                st.session_state.get("events_by_date", {}),
-                            )
-                            st.session_state.pop("google_credentials", None)
-                            st.info("החיבור נותק. האירועים ושם העובד/ת נשמרו במכשיר הזה.")
-                            # rerun intentionally avoided to preserve state
+                        save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
+                        st.session_state.pop("google_credentials", None)
+                        st.info("החיבור נותק. האירועים שכבר נטענו נשארו במכשיר הזה ולא יימחקו.")
+                        # rerun intentionally avoided to preserve state
                 except Exception as e:
                     st.error(f"שגיאה בקריאת יומנים: {e}")
 
@@ -1827,6 +1836,21 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         st.markdown("</div>", unsafe_allow_html=True)
 
 
+
+
+    st.divider()
+    st.subheader("סיום עבודה")
+    st.caption("לאחר שסיימת להעתיק/להוריד את הפלט, ניתן למחוק את הנתונים הזמניים של כלי זה.")
+    if st.button("סיום ומחיקת נתונים", type="secondary", use_container_width=True):
+        st.session_state["events_by_date"] = {}
+        st.session_state["employee_name"] = ""
+        st.session_state["employee_name_input"] = ""
+        clear_current_device_cache()
+        try:
+            clear_calendar_events_from_browser()
+        except Exception:
+            pass
+        st.success("הנתונים הזמניים נמחקו.")
 
 def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
     """
@@ -2630,6 +2654,7 @@ def render_sidebar_navigation() -> str:
 
 
 def main():
+    cleanup_expired_device_cache()
     inject_global_rtl_css()
     selected_tool = render_sidebar_navigation()
 
