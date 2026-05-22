@@ -219,6 +219,7 @@ st.set_page_config(
     page_title="מע׳ לתכנון תורנויות- פנימית ד׳",
     page_icon="🗓️",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -826,6 +827,88 @@ def inject_global_rtl_css():
             section[data-testid="stSidebar"] {
                 width: min(86vw, 420px) !important;
                 max-width: min(86vw, 420px) !important;
+            }
+        }
+
+
+        /* Android / mobile sidebar scroll fix */
+        @media (max-width: 768px) {
+            section[data-testid="stSidebar"] {
+                position: fixed !important;
+                top: 0 !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: auto !important;
+                width: min(94vw, 390px) !important;
+                min-width: min(94vw, 390px) !important;
+                max-width: min(94vw, 390px) !important;
+                height: 100dvh !important;
+                max-height: 100dvh !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior: contain !important;
+                direction: rtl !important;
+                text-align: right !important;
+                z-index: 999999 !important;
+            }
+
+            section[data-testid="stSidebar"] > div,
+            div[data-testid="stSidebarContent"] {
+                height: auto !important;
+                min-height: 100dvh !important;
+                max-height: none !important;
+                overflow-y: visible !important;
+                overflow-x: hidden !important;
+                padding-bottom: 7rem !important;
+                direction: rtl !important;
+                text-align: right !important;
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+            }
+
+            section[data-testid="stSidebar"] button,
+            section[data-testid="stSidebar"] input,
+            section[data-testid="stSidebar"] textarea,
+            section[data-testid="stSidebar"] [role="button"] {
+                min-height: 44px !important;
+                touch-action: manipulation !important;
+            }
+
+            section[data-testid="stSidebar"] * {
+                box-sizing: border-box !important;
+            }
+
+            [data-testid="collapsedControl"] {
+                left: 0.65rem !important;
+                right: auto !important;
+                top: 0.65rem !important;
+                z-index: 1000000 !important;
+            }
+
+            .stApp, [data-testid="stAppViewContainer"], .main {
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+            }
+        }
+
+        /* Android landscape: keep menu usable and scrollable */
+        @media (max-width: 940px) and (orientation: landscape) {
+            section[data-testid="stSidebar"] {
+                width: min(88vw, 430px) !important;
+                min-width: min(88vw, 430px) !important;
+                max-width: min(88vw, 430px) !important;
+                height: 100dvh !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            div[data-testid="stSidebarContent"] {
+                padding-bottom: 5rem !important;
             }
         }
 
