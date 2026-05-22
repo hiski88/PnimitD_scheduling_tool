@@ -1053,7 +1053,7 @@ def start_google_oauth() -> Optional[str]:
 
     # Persist the current screen state before sending the user to Google.
     save_device_calendar_state(
-        st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""),
+        st.session_state.get("employee_name", "") or st.session_state.get(st.session_state.get("employee_name_widget_key", "employee_name_input_0"), ""),
         st.session_state.get("events_by_date", {}),
     )
 
@@ -1555,13 +1555,19 @@ def render_shift_planning():
 
     with st.sidebar:
         st.subheader("הגדרות תכנון")
-        if "employee_name_input" not in st.session_state:
-            st.session_state["employee_name_input"] = st.session_state.get("employee_name", "") or load_employee_name_from_browser()
+        if "employee_name_widget_key" not in st.session_state:
+            st.session_state["employee_name_widget_key"] = "employee_name_input_0"
+
+        current_employee_name = st.session_state.get("employee_name", "")
+        current_widget_key = st.session_state["employee_name_widget_key"]
+
+        if current_widget_key not in st.session_state:
+            st.session_state[current_widget_key] = current_employee_name
 
         employee_name = st.text_input(
             "שם העובד/ת",
             placeholder="הקלד/י שם מלא",
-            key="employee_name_input",
+            key=current_widget_key,
         )
         st.session_state["employee_name"] = employee_name
         save_device_calendar_state(employee_name, st.session_state.get("events_by_date", {}))
@@ -1572,7 +1578,7 @@ def render_shift_planning():
             <script>
             try {{
                 localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False))});
-                localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""), ensure_ascii=False)});
+                localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get(st.session_state.get("employee_name_widget_key", "employee_name_input_0"), ""), ensure_ascii=False)});
             }} catch (e) {{}}
             </script>
             """,
@@ -1621,7 +1627,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         st.session_state["employee_name"] = (
                             load_employee_name_from_browser()
                             or st.session_state.get("employee_name", "")
-                            or st.session_state.get("employee_name_input", "")
+                            or st.session_state.get(st.session_state.get("employee_name_widget_key", "employee_name_input_0"), "")
                         )
                         save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
                         save_employee_name_to_browser(st.session_state.get("employee_name", ""))
@@ -1638,7 +1644,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                     <script>
                     try {{
                         localStorage.setItem("{CALENDAR_LOCAL_STORAGE_KEY}", {json.dumps(json.dumps(st.session_state.get("events_by_date", {}), ensure_ascii=False))});
-                        localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""), ensure_ascii=False)});
+                        localStorage.setItem("{EMPLOYEE_NAME_LOCAL_STORAGE_KEY}", {json.dumps(st.session_state.get("employee_name", "") or st.session_state.get(st.session_state.get("employee_name_widget_key", "employee_name_input_0"), ""), ensure_ascii=False)});
                     }} catch (e) {{}}
                     </script>
                     """,
@@ -1671,7 +1677,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                         if not selected_calendar_ids:
                             st.warning("יש לבחור לפחות יומן אחד.")
                         else:
-                            save_employee_name_to_browser(st.session_state.get("employee_name", "") or st.session_state.get("employee_name_input", ""))
+                            save_employee_name_to_browser(st.session_state.get("employee_name", "") or st.session_state.get(st.session_state.get("employee_name_widget_key", "employee_name_input_0"), ""))
                             new_events = read_google_events(
                                 selected_calendar_ids,
                                 st.session_state["selected_year"],
@@ -1844,13 +1850,19 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
     if st.button("סיום ומחיקת נתונים", type="secondary", use_container_width=True):
         st.session_state["events_by_date"] = {}
         st.session_state["employee_name"] = ""
-        st.session_state["employee_name_input"] = ""
+
+        # Do not assign to an existing Streamlit widget key after the widget was rendered.
+        # Rotate the widget key so the next render starts with an empty field.
+        st.session_state["employee_name_widget_key"] = f"employee_name_input_cleared_{uuid.uuid4().hex}"
+
         clear_current_device_cache()
         try:
             clear_calendar_events_from_browser()
         except Exception:
             pass
+
         st.success("הנתונים הזמניים נמחקו.")
+        st.rerun()
 
 def parse_worker_blocks(raw_text: str) -> pd.DataFrame:
     """
