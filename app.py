@@ -1158,6 +1158,60 @@ def inject_global_rtl_css():
             }
         }
 
+
+        /* Stable mobile navigation buttons */
+        @media (max-width: 768px) {
+            .month-nav-row button,
+            .month-nav-row button * {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+                font-weight: 700 !important;
+            }
+
+            /* Keep existing background but ensure readable text */
+            .month-nav-row [data-testid="baseButton-secondary"],
+            .month-nav-row button[kind="secondary"],
+            .month-nav-row .stButton > button {
+                border-radius: 14px !important;
+                min-height: 46px !important;
+            }
+
+            /* Upload card readability */
+            .mobile-upload-card {
+                background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 18px;
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .mobile-upload-card h4,
+            .mobile-upload-card p {
+                color: #f9fafb !important;
+                opacity: 1 !important;
+                margin: 0.15rem 0;
+            }
+
+            /* Force uploader internals readable */
+            [data-testid="stFileUploader"],
+            [data-testid="stFileUploader"] *,
+            [data-testid="stFileUploaderDropzone"],
+            [data-testid="stFileUploaderDropzone"] * {
+                color: #f9fafb !important;
+                -webkit-text-fill-color: #f9fafb !important;
+                opacity: 1 !important;
+            }
+
+            [data-testid="stFileUploader"] button,
+            [data-testid="stFileUploaderDropzone"] button {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                font-weight: 800 !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -1908,6 +1962,13 @@ def reset_to_next_month_from_today():
     st.session_state["selected_year"] = y
     st.session_state["selected_month"] = m
 
+
+
+def reset_to_next_month_callback():
+    y, m = default_next_month()
+    st.session_state["selected_year"] = y
+    st.session_state["selected_month"] = m
+
 def move_month(delta: int):
     y, m = add_months(st.session_state["selected_year"], st.session_state["selected_month"], delta)
     st.session_state["selected_year"] = y
@@ -2197,6 +2258,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
         with nav_a:
             if st.button("→ חודש הבא", use_container_width=True):
                 move_month(1)
+        st.markdown("</div>", unsafe_allow_html=True)
                 # rerun intentionally avoided to preserve state
         with nav_b:
             if st.button("📅 חזור לחודש הבא", use_container_width=True):
@@ -3021,6 +3083,17 @@ def render_calendar_save():
     )
 
     st.caption("לחץ/י על הכפתור הכחול Upload כדי לבחור קובץ XLSX מהמכשיר.")
+    st.markdown(
+        """
+        <div class="mobile-upload-card">
+            <h4>העלאת קובץ תורנויות</h4>
+            <p>בחר/י קובץ Excel סופי מהמכשיר.</p>
+            <p>לאחר הבחירה הקובץ ייטען אוטומטית.</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
     uploaded_file = st.file_uploader(
         "העלה קובץ תורנויות סופי",
         type=["xlsx"],

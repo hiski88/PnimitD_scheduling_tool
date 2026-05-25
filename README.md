@@ -305,3 +305,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Dark mode: all button labels/icons forced white.
 - Light mode: regular light buttons use dark text; primary/action/upload buttons use white text.
 - Existing button backgrounds and shapes are preserved.
+
+
+## Stable mobile UX fixes
+
+- Month reset button now uses a stable callback without manual rerun.
+- Mobile month navigation buttons keep original design but force readable labels.
+- Tool 3 now has a dedicated upload card above the uploader for better UX.
