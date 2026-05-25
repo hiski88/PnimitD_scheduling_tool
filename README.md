@@ -272,3 +272,12 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Fixed invisible buttons and uploader text on mobile.
 - Improved contrast for menu items and headings.
 - Desktop layout unchanged.
+
+
+## Final mobile readability and scroll fix
+
+- Mobile-only CSS override for Android dark mode.
+- Sidebar is fully scrollable with large bottom padding.
+- Tool 1 month/action buttons are forced to readable blue/white on mobile.
+- Tool 3 file uploader Upload button is forced to readable blue/white on mobile.
+- Desktop styling is untouched.

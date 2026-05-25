@@ -219,6 +219,7 @@ st.set_page_config(
     page_title="מע׳ לתכנון תורנויות- פנימית ד׳",
     page_icon="🗓️",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -960,6 +961,200 @@ def inject_global_rtl_css():
             /* Improve textarea readability */
             .main textarea {
                 color: #f9fafb !important;
+            }
+        }
+
+
+        /* FINAL mobile-only fixes: Android dark mode, buttons, upload, and sidebar scroll */
+        @media (max-width: 768px) {
+            /* Keep desktop untouched; apply only on phones */
+            html, body, .stApp, [data-testid="stAppViewContainer"] {
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+            }
+
+            /* Sidebar: fully scrollable on Android, with enough bottom padding above browser/Streamlit bars */
+            section[data-testid="stSidebar"] {
+                position: fixed !important;
+                top: 0 !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: auto !important;
+                width: min(94vw, 390px) !important;
+                min-width: min(94vw, 390px) !important;
+                max-width: min(94vw, 390px) !important;
+                height: 100dvh !important;
+                max-height: 100dvh !important;
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                -webkit-overflow-scrolling: touch !important;
+                overscroll-behavior-y: contain !important;
+                touch-action: pan-y !important;
+                z-index: 999999 !important;
+                background: #272733 !important;
+                color: #f9fafb !important;
+            }
+
+            section[data-testid="stSidebar"] > div,
+            section[data-testid="stSidebar"] > div:first-child,
+            div[data-testid="stSidebarContent"] {
+                height: auto !important;
+                min-height: 100dvh !important;
+                max-height: none !important;
+                overflow-y: visible !important;
+                overflow-x: hidden !important;
+                padding-bottom: 11rem !important;
+                background: #272733 !important;
+                color: #f9fafb !important;
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stVerticalBlock"],
+            section[data-testid="stSidebar"] [data-testid="stVerticalBlockBorderWrapper"],
+            section[data-testid="stSidebar"] [data-testid="stElementContainer"] {
+                overflow: visible !important;
+                max-height: none !important;
+            }
+
+            section[data-testid="stSidebar"] h1,
+            section[data-testid="stSidebar"] h2,
+            section[data-testid="stSidebar"] h3,
+            section[data-testid="stSidebar"] h4,
+            section[data-testid="stSidebar"] h5,
+            section[data-testid="stSidebar"] h6,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span,
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] div,
+            section[data-testid="stSidebar"] small {
+                color: #f9fafb !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+                white-space: normal !important;
+                overflow-wrap: break-word !important;
+                word-break: normal !important;
+            }
+
+            section[data-testid="stSidebar"] input,
+            section[data-testid="stSidebar"] textarea,
+            section[data-testid="stSidebar"] [data-baseweb="input"],
+            section[data-testid="stSidebar"] [data-baseweb="textarea"] {
+                background: #111827 !important;
+                color: #f9fafb !important;
+                border-color: rgba(255,255,255,0.22) !important;
+            }
+
+            section[data-testid="stSidebar"] hr {
+                border-color: rgba(255,255,255,0.25) !important;
+            }
+
+            [data-testid="collapsedControl"] {
+                left: 0.65rem !important;
+                right: auto !important;
+                top: 0.65rem !important;
+                z-index: 1000000 !important;
+            }
+
+            /* Main buttons: make text readable in Android dark mode */
+            .main .stButton > button,
+            .main .stDownloadButton > button,
+            .main button[kind],
+            .main [data-testid="baseButton-secondary"],
+            .main [data-testid="baseButton-primary"] {
+                background: #2563eb !important;
+                color: #ffffff !important;
+                border: 1px solid rgba(255,255,255,0.18) !important;
+                border-radius: 14px !important;
+                min-height: 48px !important;
+                font-weight: 800 !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+                box-shadow: 0 8px 18px rgba(37,99,235,0.18) !important;
+            }
+
+            .main .stButton > button *,
+            .main .stDownloadButton > button *,
+            .main button[kind] *,
+            .main [data-testid="baseButton-secondary"] *,
+            .main [data-testid="baseButton-primary"] * {
+                color: #ffffff !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+
+            .main .stButton > button:disabled,
+            .main .stDownloadButton > button:disabled,
+            .main button:disabled {
+                background: #334155 !important;
+                color: #e5e7eb !important;
+                opacity: 1 !important;
+            }
+
+            .main .stButton > button:disabled *,
+            .main .stDownloadButton > button:disabled *,
+            .main button:disabled * {
+                color: #e5e7eb !important;
+                opacity: 1 !important;
+            }
+
+            /* File uploader: fix dark Upload text */
+            .main [data-testid="stFileUploader"],
+            .main [data-testid="stFileUploaderDropzone"],
+            .main [data-testid="stFileUploader"] section {
+                background: #232336 !important;
+                border: 1px solid rgba(255,255,255,0.18) !important;
+                border-radius: 14px !important;
+            }
+
+            .main [data-testid="stFileUploader"] button {
+                background: #2563eb !important;
+                color: #ffffff !important;
+                border: 1px solid rgba(255,255,255,0.25) !important;
+                font-weight: 800 !important;
+                opacity: 1 !important;
+            }
+
+            .main [data-testid="stFileUploader"] button *,
+            .main [data-testid="stFileUploader"] span,
+            .main [data-testid="stFileUploader"] small,
+            .main [data-testid="stFileUploader"] p,
+            .main [data-testid="stFileUploaderDropzone"] * {
+                color: #f9fafb !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+
+            /* Main labels remain readable on white page */
+            .main label,
+            .main label *,
+            .main [data-testid="stWidgetLabel"],
+            .main [data-testid="stWidgetLabel"] *,
+            .main [data-testid="stMarkdownContainer"],
+            .main [data-testid="stMarkdownContainer"] p,
+            .main [data-testid="stMarkdownContainer"] span {
+                color: #1f2937 !important;
+                opacity: 1 !important;
+            }
+
+            .main input,
+            .main textarea,
+            .main [data-baseweb="input"] input {
+                color: #f9fafb !important;
+                opacity: 1 !important;
+            }
+        }
+
+        @media (max-width: 940px) and (orientation: landscape) {
+            section[data-testid="stSidebar"] {
+                width: min(88vw, 430px) !important;
+                min-width: min(88vw, 430px) !important;
+                max-width: min(88vw, 430px) !important;
+                height: 100dvh !important;
+                overflow-y: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            div[data-testid="stSidebarContent"] {
+                padding-bottom: 8rem !important;
             }
         }
 
