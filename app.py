@@ -884,6 +884,85 @@ def inject_global_rtl_css():
             }
         }
 
+
+        /* Mobile dark/light mode readability fixes */
+        @media (max-width: 768px) {
+
+            /* Sidebar text readability */
+            section[data-testid="stSidebar"] h1,
+            section[data-testid="stSidebar"] h2,
+            section[data-testid="stSidebar"] h3,
+            section[data-testid="stSidebar"] h4,
+            section[data-testid="stSidebar"] h5,
+            section[data-testid="stSidebar"] h6,
+            section[data-testid="stSidebar"] p,
+            section[data-testid="stSidebar"] span,
+            section[data-testid="stSidebar"] label,
+            section[data-testid="stSidebar"] div,
+            section[data-testid="stSidebar"] small {
+                color: #f3f4f6 !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+
+            /* Sidebar separators */
+            section[data-testid="stSidebar"] hr {
+                border-color: rgba(255,255,255,0.18) !important;
+            }
+
+            /* Improve radio button labels visibility */
+            section[data-testid="stSidebar"] [role="radiogroup"] label {
+                color: #f9fafb !important;
+                font-weight: 600 !important;
+            }
+
+            /* Main page buttons visibility */
+            .main button[kind],
+            .main .stButton button,
+            .main [data-testid="baseButton-secondary"],
+            .main [data-testid="baseButton-primary"] {
+                color: #ffffff !important;
+                font-weight: 700 !important;
+                opacity: 1 !important;
+            }
+
+            /* File uploader visibility */
+            .main [data-testid="stFileUploader"] section,
+            .main [data-testid="stFileUploaderDropzone"] {
+                background: #232336 !important;
+                border: 1px solid rgba(255,255,255,0.12) !important;
+            }
+
+            .main [data-testid="stFileUploader"] button,
+            .main [data-testid="stFileUploader"] span,
+            .main [data-testid="stFileUploader"] small,
+            .main [data-testid="stFileUploader"] p {
+                color: #f9fafb !important;
+                opacity: 1 !important;
+            }
+
+            /* Ensure action buttons in tool 1 remain visible */
+            .main .stDownloadButton button,
+            .main .stButton button {
+                min-height: 48px !important;
+                border-radius: 14px !important;
+            }
+
+            /* Fix invisible headings in dark mode mobile browsers */
+            .main h1,
+            .main h2,
+            .main h3,
+            .main h4 {
+                color: #1f2937 !important;
+                opacity: 1 !important;
+            }
+
+            /* Improve textarea readability */
+            .main textarea {
+                color: #f9fafb !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,

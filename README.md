@@ -264,3 +264,11 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - כלי 3 מציג כברירת מחדל את החודש הבא.
 - תוקנה בעיית נראות של כותרות ותתי־כותרות בשדות השעות במובייל/Android.
 - נוספו כותרות מחלקה / מיון / שישי בוקר מעל שדות השעות.
+
+
+## Mobile dark mode fixes
+
+- Improved sidebar readability on Android dark mode.
+- Fixed invisible buttons and uploader text on mobile.
+- Improved contrast for menu items and headings.
+- Desktop layout unchanged.
