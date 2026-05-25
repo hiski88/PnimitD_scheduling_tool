@@ -290,3 +290,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Disabled buttons remain readable.
 - File uploader Upload button and text are forced to white/blue.
 - Desktop styling unchanged.
+
+
+## תיקון כפתור חודש ועיצוב מובייל
+
+- כפתור "חזור לחודש הבא" מאופס תמיד לפי החודש הנוכחי בפועל + חודש אחד.
+- הוסר שינוי העיצוב הרחב של כפתורי מובייל.
+- נשאר רק תיקון קריאות טקסט/אייקונים בכפתורים במובייל וב-dark mode.

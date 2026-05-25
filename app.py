@@ -1191,150 +1191,65 @@ def save_employee_name_to_browser(employee_name: str) -> None:
 
 
 
+
 def inject_mobile_button_visibility_css():
     st.markdown(
         """
         <style>
         @media (max-width: 768px) {
             /*
-              Final universal mobile button fix.
-              Streamlit/BaseWeb sometimes paints secondary buttons dark in Android dark mode
-              while keeping label text dark. These rules force readable labels everywhere.
+              Mobile readability-only fix:
+              Do not change button background/design.
+              Only force readable text/icons when Streamlit Android dark mode
+              creates dark text on dark buttons.
             */
 
-            /* All Streamlit buttons, link buttons, download buttons */
-            button,
-            button *,
-            a[data-testid="stLinkButton"],
-            a[data-testid="stLinkButton"] *,
-            .stButton button,
-            .stButton button *,
-            .stDownloadButton button,
-            .stDownloadButton button *,
-            [data-testid="stButton"] button,
-            [data-testid="stButton"] button *,
-            [data-testid="stDownloadButton"] button,
-            [data-testid="stDownloadButton"] button *,
-            [data-testid^="baseButton"] ,
-            [data-testid^="baseButton"] *,
-            [role="button"],
-            [role="button"] * {
+            .main button,
+            .main button *,
+            .main .stButton button,
+            .main .stButton button *,
+            .main .stDownloadButton button,
+            .main .stDownloadButton button *,
+            .main [data-testid^="baseButton"],
+            .main [data-testid^="baseButton"] *,
+            .main [role="button"],
+            .main [role="button"] * {
                 color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
                 fill: #ffffff !important;
                 opacity: 1 !important;
                 text-shadow: none !important;
-                -webkit-text-fill-color: #ffffff !important;
             }
 
-            button,
-            .stButton button,
-            .stDownloadButton button,
-            [data-testid="stButton"] button,
-            [data-testid="stDownloadButton"] button,
-            [data-testid^="baseButton"],
-            a[data-testid="stLinkButton"],
-            [role="button"] {
-                background-color: #2563eb !important;
-                background-image: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-                border: 1px solid rgba(255,255,255,0.28) !important;
-                border-radius: 14px !important;
-                min-height: 48px !important;
-                font-weight: 800 !important;
-                box-shadow: 0 8px 18px rgba(37,99,235,0.18) !important;
-            }
-
-            /* Disabled buttons should still be readable, not black-on-black */
-            button:disabled,
-            button:disabled *,
-            .stButton button:disabled,
-            .stButton button:disabled *,
-            .stDownloadButton button:disabled,
-            .stDownloadButton button:disabled *,
-            [data-testid^="baseButton"]:disabled,
-            [data-testid^="baseButton"]:disabled * {
-                background-color: #475569 !important;
-                background-image: none !important;
-                color: #f8fafc !important;
-                fill: #f8fafc !important;
-                -webkit-text-fill-color: #f8fafc !important;
-                opacity: 1 !important;
-            }
-
-            /* File uploader: make the whole upload area and its internal button readable */
-            [data-testid="stFileUploader"],
-            [data-testid="stFileUploader"] *,
-            [data-testid="stFileUploaderDropzone"],
-            [data-testid="stFileUploaderDropzone"] *,
-            [data-testid="stFileUploaderDropzoneInstructions"],
-            [data-testid="stFileUploaderDropzoneInstructions"] *,
-            [data-testid="stFileUploaderDropzone"] button,
-            [data-testid="stFileUploaderDropzone"] button *,
-            [data-testid="stFileUploader"] button,
-            [data-testid="stFileUploader"] button * {
-                color: #ffffff !important;
-                fill: #ffffff !important;
-                opacity: 1 !important;
-                text-shadow: none !important;
-                -webkit-text-fill-color: #ffffff !important;
-            }
-
-            [data-testid="stFileUploaderDropzone"],
-            [data-testid="stFileUploader"] section {
-                background: #1f2937 !important;
-                border: 1px solid rgba(255,255,255,0.28) !important;
-                border-radius: 16px !important;
-            }
-
-            [data-testid="stFileUploader"] button,
-            [data-testid="stFileUploaderDropzone"] button {
-                background-color: #2563eb !important;
-                background-image: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
-                border: 1px solid rgba(255,255,255,0.32) !important;
-                border-radius: 12px !important;
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-                font-weight: 800 !important;
-            }
-
-            /* Icons inside buttons/upload */
-            button svg,
-            button svg *,
-            [data-testid="stFileUploader"] svg,
-            [data-testid="stFileUploader"] svg *,
-            [role="button"] svg,
-            [role="button"] svg * {
+            .main button svg,
+            .main button svg *,
+            .main [role="button"] svg,
+            .main [role="button"] svg * {
                 color: #ffffff !important;
                 stroke: #ffffff !important;
-                fill: none !important;
                 opacity: 1 !important;
             }
 
-            /* Navigation month buttons can be secondary; force readable */
-            div[data-testid="stHorizontalBlock"] button,
-            div[data-testid="stHorizontalBlock"] button * {
-                color: #ffffff !important;
-                -webkit-text-fill-color: #ffffff !important;
-                opacity: 1 !important;
-            }
-
-            /* Keep normal main text dark on white backgrounds */
-            .main h1, .main h2, .main h3, .main h4,
-            .main p, .main label,
-            .main [data-testid="stMarkdownContainer"],
-            .main [data-testid="stMarkdownContainer"] * {
-                color: #1f2937 !important;
-                opacity: 1 !important;
-            }
-
-            /* But never override button/upload text back to dark */
-            .main button, .main button *,
-            .main [role="button"], .main [role="button"] *,
+            /* File uploader only: fix invisible Upload label without changing layout */
             .main [data-testid="stFileUploader"] button,
             .main [data-testid="stFileUploader"] button *,
             .main [data-testid="stFileUploaderDropzone"] button,
-            .main [data-testid="stFileUploaderDropzone"] button * {
+            .main [data-testid="stFileUploaderDropzone"] button *,
+            .main [data-testid="stFileUploaderDropzone"] span,
+            .main [data-testid="stFileUploaderDropzone"] small,
+            .main [data-testid="stFileUploaderDropzone"] p {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
+                fill: #ffffff !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+
+            .main [data-testid="stFileUploader"] button svg,
+            .main [data-testid="stFileUploader"] button svg * {
+                stroke: #ffffff !important;
+                color: #ffffff !important;
+                opacity: 1 !important;
             }
         }
         </style>
@@ -1922,6 +1837,12 @@ def init_state():
     if "employee_name" not in st.session_state:
         st.session_state["employee_name"] = cache_payload.get("employee_name", "")
 
+
+
+def reset_to_next_month_from_today():
+    y, m = default_next_month()
+    st.session_state["selected_year"] = y
+    st.session_state["selected_month"] = m
 
 def move_month(delta: int):
     y, m = add_months(st.session_state["selected_year"], st.session_state["selected_month"], delta)
