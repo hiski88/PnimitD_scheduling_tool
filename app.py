@@ -219,7 +219,6 @@ st.set_page_config(
     page_title="מע׳ לתכנון תורנויות- פנימית ד׳",
     page_icon="🗓️",
     layout="wide",
-    initial_sidebar_state="expanded",
 )
 
 
@@ -831,84 +830,57 @@ def inject_global_rtl_css():
         }
 
 
-        /* Android / mobile sidebar scroll fix */
+        /* Mobile form-label visibility fix */
         @media (max-width: 768px) {
-            section[data-testid="stSidebar"] {
-                position: fixed !important;
-                top: 0 !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                right: auto !important;
-                width: min(94vw, 390px) !important;
-                min-width: min(94vw, 390px) !important;
-                max-width: min(94vw, 390px) !important;
-                height: 100dvh !important;
-                max-height: 100dvh !important;
-                overflow-y: auto !important;
-                overflow-x: hidden !important;
-                -webkit-overflow-scrolling: touch !important;
-                overscroll-behavior: contain !important;
-                direction: rtl !important;
-                text-align: right !important;
-                z-index: 999999 !important;
+            .main label,
+            .main label *,
+            div[data-testid="stWidgetLabel"],
+            div[data-testid="stWidgetLabel"] *,
+            div[data-testid="stMarkdownContainer"],
+            div[data-testid="stMarkdownContainer"] p,
+            div[data-testid="stMarkdownContainer"] span {
+                color: #1f2937 !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
             }
 
-            section[data-testid="stSidebar"] > div,
-            div[data-testid="stSidebarContent"] {
-                height: auto !important;
-                min-height: 100dvh !important;
-                max-height: none !important;
-                overflow-y: visible !important;
-                overflow-x: hidden !important;
-                padding-bottom: 7rem !important;
-                direction: rtl !important;
-                text-align: right !important;
+            .main [data-testid="stTimeInput"] label,
+            .main [data-testid="stNumberInput"] label,
+            .main [data-testid="stFileUploader"] label {
+                color: #1f2937 !important;
+                opacity: 1 !important;
+                font-weight: 700 !important;
+                font-size: 0.95rem !important;
+                margin-bottom: 0.35rem !important;
+                display: block !important;
             }
 
-            section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
+            .main h1,
+            .main h2,
+            .main h3,
+            .main h4,
+            .main h5,
+            .main h6 {
+                color: #1f2937 !important;
+                opacity: 1 !important;
             }
 
-            section[data-testid="stSidebar"] button,
-            section[data-testid="stSidebar"] input,
-            section[data-testid="stSidebar"] textarea,
-            section[data-testid="stSidebar"] [role="button"] {
-                min-height: 44px !important;
-                touch-action: manipulation !important;
+            .main small,
+            .main .stCaptionContainer,
+            .main [data-testid="stCaptionContainer"] {
+                color: #4b5563 !important;
+                opacity: 1 !important;
             }
 
-            section[data-testid="stSidebar"] * {
-                box-sizing: border-box !important;
+            .main input,
+            .main textarea,
+            .main [data-baseweb="input"],
+            .main [data-baseweb="select"] {
+                color: #f9fafb !important;
             }
 
-            [data-testid="collapsedControl"] {
-                left: 0.65rem !important;
-                right: auto !important;
-                top: 0.65rem !important;
-                z-index: 1000000 !important;
-            }
-
-            .stApp, [data-testid="stAppViewContainer"], .main {
-                max-width: 100vw !important;
-                overflow-x: hidden !important;
-            }
-        }
-
-        /* Android landscape: keep menu usable and scrollable */
-        @media (max-width: 940px) and (orientation: landscape) {
-            section[data-testid="stSidebar"] {
-                width: min(88vw, 430px) !important;
-                min-width: min(88vw, 430px) !important;
-                max-width: min(88vw, 430px) !important;
-                height: 100dvh !important;
-                overflow-y: auto !important;
-                -webkit-overflow-scrolling: touch !important;
-            }
-
-            div[data-testid="stSidebarContent"] {
-                padding-bottom: 5rem !important;
+            .main [data-baseweb="input"] input {
+                color: #f9fafb !important;
             }
         }
 
@@ -2642,7 +2614,7 @@ def render_calendar_save():
         help="הקובץ צריך לכלול את עמודות: יום בחודש, יום בשבוע, מחלקה, מיון, שישי בוקר.",
     )
 
-    default_y, default_m = default_current_month()
+    default_y, default_m = default_next_month()
     col_year, col_month = st.columns(2)
     with col_year:
         selected_year = st.number_input("שנה", min_value=2024, max_value=2100, value=default_y, step=1, key="ics_year")
@@ -2652,12 +2624,15 @@ def render_calendar_save():
     st.subheader("שעות תורנות")
     time_col1, time_col2, time_col3 = st.columns(3)
     with time_col1:
+        st.markdown("**מחלקה**")
         department_start = st.time_input("מחלקה - התחלה", value=time(8, 0))
         department_end = st.time_input("מחלקה - סיום למחרת", value=time(10, 0))
     with time_col2:
+        st.markdown("**מיון**")
         er_start = st.time_input("מיון - התחלה", value=time(16, 0))
         er_end = st.time_input("מיון - סיום למחרת", value=time(8, 0))
     with time_col3:
+        st.markdown("**שישי בוקר**")
         friday_morning_start = st.time_input("שישי בוקר - התחלה", value=time(8, 0))
         friday_morning_end = st.time_input("שישי בוקר - סיום", value=time(14, 0))
 
