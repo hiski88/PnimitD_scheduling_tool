@@ -325,3 +325,8 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 ## Tool 1 XLSX button color fix
 
 - The Tool 1 "הורד XLSX" download button is now forced blue with white readable text, including mobile dark mode.
+
+
+## XLSX button primary fix
+
+- The Tool 1 XLSX download button now explicitly uses type="primary" so it renders blue consistently on mobile/dark mode.

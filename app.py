@@ -2461,6 +2461,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                 data=xlsx_bytes,
                 file_name=f"availability_{employee_name}_{y}_{m:02d}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
                 use_container_width=True,
             )
             st.markdown('</div>', unsafe_allow_html=True)
