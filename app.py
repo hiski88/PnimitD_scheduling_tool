@@ -1192,18 +1192,22 @@ def save_employee_name_to_browser(employee_name: str) -> None:
 
 
 
+
 def inject_mobile_button_visibility_css():
     st.markdown(
         """
         <style>
-        @media (max-width: 768px) {
-            /*
-              Mobile readability-only fix:
-              Do not change button background/design.
-              Only force readable text/icons when Streamlit Android dark mode
-              creates dark text on dark buttons.
-            */
+        /*
+          FINAL MOBILE BUTTON CONTRAST RULES
+          Scope: mobile only.
+          Goal: preserve existing button design/backgrounds and change only text/icon contrast.
+        */
 
+        @media (max-width: 768px) and (prefers-color-scheme: dark) {
+            /*
+              In Android dark mode, Streamlit/BaseWeb may render buttons with dark backgrounds
+              but keep the text dark/gray. In dark mode every button label/icon must be white.
+            */
             .main button,
             .main button *,
             .main .stButton button,
@@ -1212,8 +1216,14 @@ def inject_mobile_button_visibility_css():
             .main .stDownloadButton button *,
             .main [data-testid^="baseButton"],
             .main [data-testid^="baseButton"] *,
+            .main a[data-testid="stLinkButton"],
+            .main a[data-testid="stLinkButton"] *,
             .main [role="button"],
-            .main [role="button"] * {
+            .main [role="button"] *,
+            .main [data-testid="stFileUploader"] button,
+            .main [data-testid="stFileUploader"] button *,
+            .main [data-testid="stFileUploaderDropzone"] button,
+            .main [data-testid="stFileUploaderDropzone"] button * {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
                 fill: #ffffff !important;
@@ -1224,31 +1234,85 @@ def inject_mobile_button_visibility_css():
             .main button svg,
             .main button svg *,
             .main [role="button"] svg,
-            .main [role="button"] svg * {
+            .main [role="button"] svg *,
+            .main [data-testid="stFileUploader"] svg,
+            .main [data-testid="stFileUploader"] svg * {
                 color: #ffffff !important;
                 stroke: #ffffff !important;
                 opacity: 1 !important;
             }
 
-            /* File uploader only: fix invisible Upload label without changing layout */
-            .main [data-testid="stFileUploader"] button,
-            .main [data-testid="stFileUploader"] button *,
-            .main [data-testid="stFileUploaderDropzone"] button,
-            .main [data-testid="stFileUploaderDropzone"] button *,
-            .main [data-testid="stFileUploaderDropzone"] span,
-            .main [data-testid="stFileUploaderDropzone"] small,
-            .main [data-testid="stFileUploaderDropzone"] p {
+            /*
+              Upload/dropzone text that is not technically inside the button.
+              Keep it readable on the dark upload area.
+            */
+            .main [data-testid="stFileUploader"],
+            .main [data-testid="stFileUploader"] *,
+            .main [data-testid="stFileUploaderDropzone"],
+            .main [data-testid="stFileUploaderDropzone"] *,
+            .main [data-testid="stFileUploaderDropzoneInstructions"],
+            .main [data-testid="stFileUploaderDropzoneInstructions"] * {
                 color: #ffffff !important;
                 -webkit-text-fill-color: #ffffff !important;
-                fill: #ffffff !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+        }
+
+        @media (max-width: 768px) and (prefers-color-scheme: light) {
+            /*
+              In regular/light mobile mode, secondary light buttons should remain black text.
+              Primary/action buttons remain white text.
+            */
+            .main button,
+            .main button *,
+            .main .stButton button,
+            .main .stButton button *,
+            .main .stDownloadButton button,
+            .main .stDownloadButton button *,
+            .main [data-testid="baseButton-secondary"],
+            .main [data-testid="baseButton-secondary"] *,
+            .main [role="button"],
+            .main [role="button"] * {
+                color: #111827 !important;
+                -webkit-text-fill-color: #111827 !important;
+                fill: #111827 !important;
                 opacity: 1 !important;
                 text-shadow: none !important;
             }
 
-            .main [data-testid="stFileUploader"] button svg,
-            .main [data-testid="stFileUploader"] button svg * {
-                stroke: #ffffff !important;
+            .main [data-testid="baseButton-primary"],
+            .main [data-testid="baseButton-primary"] *,
+            .main button[kind="primary"],
+            .main button[kind="primary"] *,
+            .main a[data-testid="stLinkButton"],
+            .main a[data-testid="stLinkButton"] * {
                 color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                fill: #ffffff !important;
+                opacity: 1 !important;
+            }
+
+            /*
+              Upload button can be dark even in light mode on some Android browsers,
+              so force upload button text/icon to white.
+            */
+            .main [data-testid="stFileUploader"] button,
+            .main [data-testid="stFileUploader"] button *,
+            .main [data-testid="stFileUploaderDropzone"] button,
+            .main [data-testid="stFileUploaderDropzone"] button * {
+                color: #ffffff !important;
+                -webkit-text-fill-color: #ffffff !important;
+                fill: #ffffff !important;
+                opacity: 1 !important;
+            }
+
+            .main [data-testid="stFileUploader"] button svg,
+            .main [data-testid="stFileUploader"] button svg *,
+            .main [data-testid="stFileUploaderDropzone"] button svg,
+            .main [data-testid="stFileUploaderDropzone"] button svg * {
+                color: #ffffff !important;
+                stroke: #ffffff !important;
                 opacity: 1 !important;
             }
         }

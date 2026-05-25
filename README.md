@@ -297,3 +297,11 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - כפתור "חזור לחודש הבא" מאופס תמיד לפי החודש הנוכחי בפועל + חודש אחד.
 - הוסר שינוי העיצוב הרחב של כפתורי מובייל.
 - נשאר רק תיקון קריאות טקסט/אייקונים בכפתורים במובייל וב-dark mode.
+
+
+## Mobile button contrast final
+
+- Mobile-only contrast fix.
+- Dark mode: all button labels/icons forced white.
+- Light mode: regular light buttons use dark text; primary/action/upload buttons use white text.
+- Existing button backgrounds and shapes are preserved.
