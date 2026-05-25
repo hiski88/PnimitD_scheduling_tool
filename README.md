@@ -312,3 +312,11 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Month reset button now uses a stable callback without manual rerun.
 - Mobile month navigation buttons keep original design but force readable labels.
 - Tool 3 now has a dedicated upload card above the uploader for better UX.
+
+
+## Tool 1 stable month selector and button colors
+
+- Tool 1 month navigation buttons were replaced with month/year selectboxes.
+- Default month remains next month via session initialization.
+- Most action buttons are blue with white text.
+- Only "שמור והפק פלט" and "סיום ומחיקת נתונים" are red with white text.

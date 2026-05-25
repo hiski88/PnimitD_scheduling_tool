@@ -1212,6 +1212,57 @@ def inject_global_rtl_css():
             }
         }
 
+
+        /* Stable Tool 1 button colors */
+        .main .stButton button[kind="primary"],
+        .main [data-testid="baseButton-primary"] {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            font-weight: 800 !important;
+        }
+
+        .main .stButton button[kind="primary"] *,
+        .main [data-testid="baseButton-primary"] * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+        .red-action-button .stButton button,
+        .red-action-button button,
+        .red-action-button [data-testid="baseButton-primary"] {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            font-weight: 850 !important;
+        }
+
+        .red-action-button .stButton button *,
+        .red-action-button button *,
+        .red-action-button [data-testid="baseButton-primary"] * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            opacity: 1 !important;
+        }
+
+        @media (max-width: 768px) {
+            .main .stButton button,
+            .main .stDownloadButton button,
+            .main [data-testid^="baseButton"] {
+                min-height: 48px !important;
+                border-radius: 14px !important;
+                font-weight: 800 !important;
+            }
+
+            .main .stSelectbox label,
+            .main [data-testid="stSelectbox"] label {
+                color: #1f2937 !important;
+                opacity: 1 !important;
+                font-weight: 700 !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -2201,7 +2252,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 
                     st.caption("האירועים יוצגו עם שעה ושם היומן. טעינת יומן נוסף תתווסף לאירועים שכבר נטענו. הנתונים נשמרים במכשיר הנוכחי בלבד.")
 
-                    if st.button("טען אירועים מכל היומנים שנבחרו"):
+                    if st.button("טען אירועים מכל היומנים שנבחרו", type="primary"):
                         if not selected_calendar_ids:
                             st.warning("יש לבחור לפחות יומן אחד.")
                         else:
@@ -2231,12 +2282,12 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                             total_count = sum(len(v) for v in merged_events.values())
                             st.success(f"נוספו {added_count} אירועים. סה״כ מוצגים כעת {total_count} אירועים.")
 
-                    if st.button("נקה אירועים מהמכשיר הזה"):
+                    if st.button("נקה אירועים מהמכשיר הזה", type="primary"):
                         st.session_state["events_by_date"] = {}
                         clear_calendar_events_from_browser()
                         st.success("האירועים נוקו מהמכשיר הנוכחי בלבד.")
 
-                    if st.button("נתק חיבור ליומן"):
+                    if st.button("נתק חיבור ליומן", type="primary"):
                         save_calendar_events_to_browser(st.session_state.get("events_by_date", {}))
                         st.session_state.pop("google_credentials", None)
                         st.info("החיבור נותק. האירועים שכבר נטענו נשארו במכשיר הזה ולא יימחקו.")
@@ -2245,27 +2296,41 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                     st.error(f"שגיאה בקריאת יומנים: {e}")
 
 
-    # Month navigation
-    nav_right, nav_center, nav_left = st.columns([1, 2.1, 1])
-    with nav_right:
-        if st.button("חודש קודם ←", use_container_width=True):
-            move_month(-1)
-            # rerun intentionally avoided to preserve state
-    with nav_center:
-        render_month_nav_card(st.session_state["selected_year"], st.session_state["selected_month"])
-    with nav_left:
-        nav_a, nav_b = st.columns(2)
-        with nav_a:
-            if st.button("→ חודש הבא", use_container_width=True):
-                move_month(1)
-        st.markdown("</div>", unsafe_allow_html=True)
-                # rerun intentionally avoided to preserve state
-        with nav_b:
-            if st.button("📅 חזור לחודש הבא", use_container_width=True):
-                y, m = default_next_month()
-                st.session_state["selected_year"] = y
-                st.session_state["selected_month"] = m
-                # rerun intentionally avoided to preserve state
+    # Month selection - stable on mobile and desktop
+    month_names = [
+        "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+        "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"
+    ]
+
+    st.subheader("חודש לתכנון")
+    month_col, year_col = st.columns(2)
+
+    with month_col:
+        selected_month_index = st.selectbox(
+            "חודש",
+            options=list(range(1, 13)),
+            index=st.session_state["selected_month"] - 1,
+            format_func=lambda month_num: month_names[month_num - 1],
+            key="planning_month_select",
+        )
+
+    with year_col:
+        current_year = date.today().year
+        year_options = list(range(current_year - 1, current_year + 6))
+        selected_year_value = st.selectbox(
+            "שנה",
+            options=year_options,
+            index=year_options.index(st.session_state["selected_year"]) if st.session_state["selected_year"] in year_options else 1,
+            key="planning_year_select",
+        )
+
+    st.session_state["selected_month"] = int(selected_month_index)
+    st.session_state["selected_year"] = int(selected_year_value)
+
+    st.markdown(
+        f"<div class='month-title'>{month_title(st.session_state['selected_year'], st.session_state['selected_month'])}</div>",
+        unsafe_allow_html=True,
+    )
 
     y = st.session_state["selected_year"]
     m = st.session_state["selected_month"]
@@ -2301,7 +2366,9 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
     submission_text = build_copyable_submission_text(edited_df, employee_name)
 
     with col_finish:
+        st.markdown('<div class="red-action-button">', unsafe_allow_html=True)
         submitted = st.button("שמור והפק פלט", type="primary", use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_preview:
         st.markdown("""<div class="choices-panel-header"><div><div class="choices-panel-title">סיכום בחירות</div><div class="choices-panel-subtitle">רשימת כל הבחירות שבוצעו במהלך החודש</div></div></div>""", unsafe_allow_html=True)
@@ -2376,7 +2443,10 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
     st.divider()
     st.subheader("סיום עבודה")
     st.caption("לאחר שסיימת להעתיק/להוריד את הפלט, ניתן למחוק את הנתונים הזמניים של כלי זה.")
-    if st.button("סיום ומחיקת נתונים", type="secondary", use_container_width=True):
+    st.markdown('<div class="red-action-button">', unsafe_allow_html=True)
+    finish_delete_clicked = st.button("סיום ומחיקת נתונים", type="primary", use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    if finish_delete_clicked:
         st.session_state["events_by_date"] = {}
         st.session_state["employee_name"] = ""
 
