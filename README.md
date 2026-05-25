@@ -320,3 +320,8 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Default month remains next month via session initialization.
 - Most action buttons are blue with white text.
 - Only "שמור והפק פלט" and "סיום ומחיקת נתונים" are red with white text.
+
+
+## Tool 1 XLSX button color fix
+
+- The Tool 1 "הורד XLSX" download button is now forced blue with white readable text, including mobile dark mode.

@@ -1263,6 +1263,34 @@ def inject_global_rtl_css():
             }
         }
 
+
+        /* Tool 1 XLSX download button - blue and readable */
+        .blue-download-button .stDownloadButton button,
+        .blue-download-button button,
+        .blue-download-button [data-testid="baseButton-secondary"] {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+            color: #ffffff !important;
+            border: none !important;
+            font-weight: 800 !important;
+        }
+
+        .blue-download-button .stDownloadButton button *,
+        .blue-download-button button *,
+        .blue-download-button [data-testid="baseButton-secondary"] * {
+            color: #ffffff !important;
+            -webkit-text-fill-color: #ffffff !important;
+            opacity: 1 !important;
+            text-shadow: none !important;
+        }
+
+        @media (max-width: 768px) {
+            .blue-download-button .stDownloadButton button,
+            .blue-download-button button {
+                min-height: 48px !important;
+                border-radius: 14px !important;
+            }
+        }
+
         </style>
         """,
         unsafe_allow_html=True,
@@ -2427,6 +2455,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
             render_copy_button(submission_text, "העתק")
         with xlsx_col:
             xlsx_bytes = availability_table_to_xlsx_bytes(edited_df, employee_name, y, m)
+            st.markdown('<div class="blue-download-button">', unsafe_allow_html=True)
             st.download_button(
                 "הורד XLSX",
                 data=xlsx_bytes,
@@ -2434,6 +2463,7 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 use_container_width=True,
             )
+            st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
 
