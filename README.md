@@ -281,3 +281,12 @@ redirect_uri = "https://YOUR_APP.streamlit.app"
 - Tool 1 month/action buttons are forced to readable blue/white on mobile.
 - Tool 3 file uploader Upload button is forced to readable blue/white on mobile.
 - Desktop styling is untouched.
+
+
+## Universal mobile button visibility fix
+
+- Added a late CSS injection that overrides Streamlit/BaseWeb mobile button colors.
+- All mobile buttons are forced to readable blue/white.
+- Disabled buttons remain readable.
+- File uploader Upload button and text are forced to white/blue.
+- Desktop styling unchanged.
